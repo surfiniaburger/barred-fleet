@@ -298,3 +298,7 @@ The deploy command uses private access by default via `--no-allow-unauthenticate
 - `tests/unit/test_run_registry.py`: run registry resolver tests.
 - `tests/unit/test_demo.py`: demo surface tests.
 - `demo/README.md`: captured proof index.
+
+## License
+
+Apache License 2.0. See `LICENSE`.
