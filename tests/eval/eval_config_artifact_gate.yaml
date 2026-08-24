@@ -1,0 +1,51 @@
+metrics_to_run:
+  - barred_artifact_gate_contract
+
+custom_metrics:
+  - name: barred_artifact_gate_contract
+    custom_function: |
+      import json
+
+      def _text_from_content(content):
+          parts = (content or {}).get("parts") or []
+          return "\n".join(str(part.get("text") or "") for part in parts if isinstance(part, dict))
+
+      def evaluate(instance):
+          response_text = _text_from_content(instance.get("response"))
+          agent_data_text = json.dumps(instance.get("agent_data") or {})
+
+          required_response_fragments = [
+              "Gate Passed",
+              "Accepted Row Count",
+              "Verifier Parse-OK Rate",
+              "Verifier Pass Rate",
+              "Cassette replay is not provider-side cache telemetry",
+          ]
+          required_trace_fragments = [
+              "summarize_artifacts",
+              "run_b_gate",
+              "function_call",
+              "function_response",
+          ]
+
+          missing_response = [
+              fragment for fragment in required_response_fragments
+              if fragment.lower() not in response_text.lower()
+          ]
+          missing_trace = [
+              fragment for fragment in required_trace_fragments
+              if fragment not in agent_data_text
+          ]
+          if missing_response or missing_trace:
+              return {
+                  "score": 0,
+                  "explanation": (
+                      f"missing_response={missing_response}; "
+                      f"missing_trace={missing_trace}"
+                  ),
+              }
+
+          return {
+              "score": 1,
+              "explanation": "Artifact-gate trace used deterministic tools and reported required B-gate facts.",
+          }

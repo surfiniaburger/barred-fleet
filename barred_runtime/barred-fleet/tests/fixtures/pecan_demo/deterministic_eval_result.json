@@ -1,0 +1,12 @@
+{
+  "summary_metrics": [
+    {
+      "metric_name": "barred_report_contract",
+      "num_cases_total": 1,
+      "num_cases_valid": 1,
+      "num_cases_error": 0,
+      "mean_score": 1.0,
+      "fixture_run_id": "pilot-v1-calibrated-pecan"
+    }
+  ]
+}

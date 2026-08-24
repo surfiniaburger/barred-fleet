@@ -1,0 +1,11 @@
+{
+  "summary_metrics": [
+    {
+      "metric_name": "barred_artifact_gate_contract",
+      "num_cases_total": 1,
+      "num_cases_valid": 1,
+      "num_cases_error": 0,
+      "mean_score": 1.0
+    }
+  ]
+}

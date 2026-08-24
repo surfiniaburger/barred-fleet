@@ -1,0 +1,25 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "barred_smoke_observability_report",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Use report_barred_run to build a deterministic observability report for run_id adk-smoke-cloud-fixture. Use input_path barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl, attempts_path barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl, deterministic_eval_result_path barred-fleet/tests/fixtures/adk_smoke_cloud/deterministic_eval_result.json, and min_verifier_parse_ok_rate 1.0. Report the overall report status, B-gate pass status, accepted row count, verifier parse-ok rate, deterministic eval score, model routing summary, and state that cassette replay is not provider-side cache telemetry."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "The observability report status is ok. B-gate passed with 1 accepted row and verifier_parse_ok_rate 1.0. The deterministic eval score is 1.0. Model routing includes ollama/gemma4:31b-cloud and ollama/gpt-oss:120b-cloud. Cassette replay is not provider-side cache telemetry."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

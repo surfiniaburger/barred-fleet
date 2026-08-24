@@ -1,0 +1,25 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "barred_smoke_artifact_gate",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Use only deterministic BARRED artifact tools. Summarize barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl, then run the B-gate on barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl with attempts_path barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl and min_verifier_parse_ok_rate 1.0. Report whether the gate passed, the accepted row count, verifier parse-ok rate, verifier pass rate, and explicitly say cassette replay is not provider-side cache telemetry."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "The B-gate passed with 1 accepted row, verifier_parse_ok_rate 1.0, and verifier_pass_rate 1.0. Cassette replay is not provider-side cache telemetry."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

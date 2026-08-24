@@ -1,0 +1,10 @@
+{
+  "runs": {
+    "pilot-v1-calibrated-pecan": {
+      "input_path": "training_corpus_calibrated_pecan.jsonl",
+      "attempts_path": "artifacts/attempts/pilot-v1-calibrated-pecan.jsonl",
+      "deterministic_eval_result_path": "barred-fleet/tests/fixtures/pecan_demo/deterministic_eval_result.json",
+      "min_verifier_parse_ok_rate": 1.0
+    }
+  }
+}

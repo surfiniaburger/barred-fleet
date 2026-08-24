@@ -1,0 +1,50 @@
+metrics_to_run:
+  - b_gate_decision
+  - token_usage_total
+  - turn_count
+
+custom_metrics:
+  - name: b_gate_decision
+    custom_function: |
+      import json
+
+      def evaluate(instance):
+          response = instance.get("response") or {}
+          text_parts = []
+          for part in response.get("parts", []):
+              if isinstance(part, dict) and part.get("text"):
+                  text_parts.append(part["text"])
+          full_text = "\n".join(text_parts).lower()
+          
+          # Check for explicit acceptance/pass or rejection/fail in the audit explanation
+          passed = any(kw in full_text for kw in ["gate passed", "accepted", "verdict: true", "b-gate passed", "status: ok"])
+          return {
+              "score": 1 if passed else 0,
+              "explanation": "Evaluated B-gate pass status from audit output."
+          }
+
+  - name: token_usage_total
+    custom_function: |
+      def evaluate(instance):
+          agent_data = instance.get("agent_data") or {}
+          # Attempt to extract token usage if available from trace metadata
+          usage = agent_data.get("llm_usage", {}).get("totals", {})
+          total_tokens = usage.get("total_tokens", 0)
+          if not total_tokens:
+              # Fallback estimate based on character length across events
+              events = agent_data.get("events", [])
+              approx_tokens = sum(len(str(e)) // 4 for e in events)
+              total_tokens = approx_tokens
+          return {
+              "score": total_tokens,
+              "explanation": f"Total estimated/recorded token spend: {total_tokens}"
+          }
+
+  - name: turn_count
+    custom_function: |
+      def evaluate(instance):
+          turns = (instance.get("agent_data") or {}).get("turns", [])
+          return {
+              "score": len(turns),
+              "explanation": f"Total turn count: {len(turns)}"
+          }

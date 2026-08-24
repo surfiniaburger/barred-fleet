@@ -1,0 +1,13 @@
+project_id              = "gem-creation"
+location                = "us-east1"
+gateway_id              = "barred-agent-gateway-v1"
+runtime_service_account = "barred-fleet-runtime@gem-creation.iam.gserviceaccount.com"
+
+# Set true only if this Terraform workspace owns API enablement.
+enable_project_services = false
+
+# Grants roles/networkservices.viewer so Cloud Run can verify the gateway resource.
+grant_runtime_viewer = true
+
+# Optional. Add Agent Registry URIs later when registered agents/tools are ready.
+agent_registries = []
