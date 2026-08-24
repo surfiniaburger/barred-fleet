@@ -38,7 +38,12 @@ BARRED-Fleet applies that lesson to vulnerability acceptance. Agents can debate,
 - Materializes the artifacts inside Cloud Run for deterministic evaluation.
 - Computes B-gate pass/fail using deterministic code, not model self-report.
 - Shows accepted/rejected rows, verifier parse/pass rates, model routing, deterministic eval score, and artifact provenance.
+- Provides product-shaped run routes: `POST /runs`, `GET /runs/{run_id}`, and `GET /runs/{run_id}/report`.
 - Lets a reviewer choose `fixture:first` or `cve500:N`, preview bounded seed metadata, and run a one-attempt live debate only when server-side live flags are explicitly enabled.
+- Exposes `/seeds/manifest` so seed sources are allowlisted and digest-auditable.
+- Screens seed input with Model Armor before live execution when configured.
+- Checks route/tool egress with an Agent Gateway receipt before live execution.
+- Exposes a read-only redacted GEPA memory preview at `/memory/gepa/preview`.
 - Provides a read-only `/demo` UI and `/demo/report` JSON endpoint.
 - Keeps the Cloud Run service private after proof capture; unauthenticated `/demo` returns `HTTP/2 403`.
 
@@ -46,11 +51,16 @@ BARRED-Fleet applies that lesson to vulnerability acceptance. Agents can debate,
 
 We wrapped an existing BARRED local research harness with a new Google ADK project called `barred-fleet`.
 
-The deployed Cloud Run service exposes three paths:
+The deployed Cloud Run service exposes a compact product API:
 
 - `/demo`: browser-readable proof surface for judges.
 - `/demo/report`: JSON report endpoint used by the UI and by the ADK agent tool path.
-- `/runs/fresh-demo`: dry-run-first bounded fresh-debate endpoint for `fixture:first` and packaged `cve500:N` seeds.
+- `/seeds/manifest`: allowlisted seed sources, counts, and SHA-256 digests.
+- `/runs`: product lifecycle wrapper for dry-run or bounded fresh debate.
+- `/runs/fresh-demo`: backward-compatible demo wrapper for `fixture:first` and packaged `cve500:N` seeds.
+- `/runs/{run_id}`: durable run status.
+- `/runs/{run_id}/report`: artifact-backed product report or blocked/planned diagnostic report.
+- `/memory/gepa/preview`: redacted GEPA/Pareto memory preview.
 
 The ADK root agent calls `report_barred_run` with only a run ID. The tool resolves run metadata from Firestore, reads private GCS artifacts, runs deterministic B-gate checks, and returns a report. The LLM narrates the computed result; it does not decide acceptance.
 
@@ -64,6 +74,8 @@ The ADK root agent calls `report_barred_run` with only a run ID. The tool resolv
 - Firestore Native named database for run metadata
 - Cloud Logging / Trace-ready deployment configuration
 - Vertex/Gemini-compatible ADK configuration path
+- Google Cloud Model Armor for configured seed-screening receipts
+- Google Agent Gateway / Network Services egress-governance resource and local policy adapter
 
 ## External Context Links
 
@@ -136,8 +148,12 @@ judge/verifier route: ollama/gpt-oss:120b-cloud
 - Firestore-backed run-id metadata lookup.
 - Private GCS-backed artifact resolution.
 - Bounded seed selector for `fixture:first` and packaged `cve500:N` seeds.
+- Product run lifecycle API: `POST /runs`, `GET /runs/{run_id}`, and `GET /runs/{run_id}/report`.
 - Dry-run-first fresh debate UI with server-gated bounded live execution.
-- Read-only `/demo` and `/demo/report` surfaces.
+- Model Armor seed-screening receipt path and guaranteed-block smoke contract.
+- Agent Gateway route/tool-egress receipt path and guaranteed-block smoke contract.
+- Redacted GEPA memory preview surface.
+- Read-only `/demo`, `/demo/report`, `/seeds/manifest`, and `/memory/gepa/preview` surfaces.
 - Deterministic report contract and unit/eval checks.
 - Browser proof package and demo script.
 
@@ -160,22 +176,24 @@ This submission claims the new Google ADK + Cloud Run enterprise-agent layer aro
 - Deployed BARRED-Fleet to Cloud Run with a dedicated runtime service account.
 - Verified private Cloud Run access: authenticated demo works, unauthenticated `/demo` returns `403`.
 - Added Firestore metadata lookup and private GCS artifact reads behind a short run-id interface.
-- Added a browser dashboard that shows B-gate status, verifier rates, model routing, deterministic eval, and provenance.
+- Added product run lifecycle routes and artifact-backed report enrichment.
+- Added Model Armor and Agent Gateway receipt boundaries before live execution.
+- Added a browser dashboard that shows B-gate status, verifier rates, model routing, deterministic eval, safety receipts, and provenance.
 - Verified the ADK smoke prompt calls the deployed `report_barred_run` tool and returns the expected deterministic report.
 
 ## What We Learned
 
 The hard part is not generating more AI security examples. The hard part is deciding which outputs deserve to become accepted evidence. A useful enterprise agent needs provenance, deterministic gates, model-route visibility, and honest boundaries between model narration and computed facts.
 
+Safety controls are deliberately scoped: Model Armor handles content-safety screening, Agent Gateway handles route/tool-egress governance, and deterministic B-gate remains the only vulnerability-acceptance authority.
+
 ## What's Next
 
-- Add production artifact upload/write lifecycle around the current GCS read path.
-- Add production run-write lifecycle around the current Firestore metadata read path.
-- Move from bounded fresh demo execution to async cloud jobs with durable status.
-- Add GCS-backed seed source of truth.
-- Add long-running asynchronous run orchestration.
-- Harden the current Agent Gateway egress receipt path into a fuller production gateway policy.
+- Move synchronous bounded fresh runs to async cloud jobs with clearer queued/running/completed transitions.
+- Promote seed source of truth from packaged `cve500:N` files to managed GCS objects after demo stability.
+- Harden the current Agent Gateway egress receipt path into a fuller production policy with registered tools/agents.
 - Expand the current Model Armor seed-screening path to additional artifact/output boundaries.
+- Write redacted GEPA memory summaries to Firestore once the preview contract is stable.
 - Evaluate Agent Runtime, Memory Bank, Agent Registry, and richer observability once the core Cloud Run adapter is stable.
 
 ## Demo Assets
@@ -201,11 +219,7 @@ barred-fleet/demo/DEMO_SCRIPT.md
 ## Repository
 
 ```text
-agent_training/silver-one
+barred-fleet
 ```
 
-Primary project path:
-
-```text
-agent_training/silver-one/barred-fleet
-```
+This is the standalone submission repository. The broader Silver-One workspace is disclosed as the source of pre-existing BARRED research-harness components.

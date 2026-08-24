@@ -1,4 +1,4 @@
-.PHONY: test-tools test-unit demo-smoke product-report-smoke gepa-memory-preview-local gepa-memory-preview-smoke verify-gepa-memory-preview verify-demo verify-fresh-demo verify-packaged-stack eval-artifact-gate-generate eval-artifact-gate-grade eval-artifact-gate-grade-deterministic eval-report-generate eval-report-grade-deterministic
+.PHONY: test-tools test-unit demo-smoke product-report-smoke verify-product-run gepa-memory-preview-local gepa-memory-preview-smoke verify-gepa-memory-preview verify-demo verify-fresh-demo verify-packaged-stack eval-artifact-gate-generate eval-artifact-gate-grade eval-artifact-gate-grade-deterministic eval-report-generate eval-report-grade-deterministic
 
 ADK_EVAL_URL ?= http://127.0.0.1:18100
 ADK_APP_NAME ?= app
@@ -15,6 +15,8 @@ test-unit:
 
 demo-smoke:
 	agents-cli run --url $(DEMO_URL) --mode adk "$(DEMO_PROMPT)"
+
+verify-product-run: product-report-smoke
 
 product-report-smoke:
 	@echo "[product-report-smoke] checking authenticated dry-run /runs report contract"

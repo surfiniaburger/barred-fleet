@@ -18,18 +18,24 @@ BARRED-Fleet makes that acceptance layer visible.
 
 ## What This Demo Shows
 
-The deployed demo uses the curated run `pilot-v1-calibrated-pecan`.
+The deployed demo has two modes:
+
+1. **Curated report mode** for `pilot-v1-calibrated-pecan`.
+2. **Bounded fresh-run mode** for `fixture:first` or packaged `cve500:N` seeds.
 
 It reports:
 
 - B-gate pass/fail.
 - Accepted and rejected attempt counts.
 - Verifier parse/pass rates.
-- Asymmetric model routing: `ollama/gemma4:31b-cloud` and `ollama/gpt-oss:120b-cloud`.
-- Deterministic eval score.
+- Asymmetric model routing: `ollama/gemma4:31b-cloud` and `ollama/gpt-oss:120b-cloud` for the curated fixture, with Vertex/Gemini-compatible routes for bounded fresh runs.
+- Deterministic eval score and deterministic receipt presence.
 - Provenance chain: Firestore metadata → private GCS artifacts → deterministic B-gate → ADK narration.
+- Product run lifecycle: `POST /runs`, `GET /runs/{run_id}`, and `GET /runs/{run_id}/report`.
+- Seed manifest and bounded selector: `/seeds/manifest`, `fixture:first`, and `cve500:N` only.
+- Model Armor seed-screening receipt and Agent Gateway route/tool-egress receipt before live execution.
+- Read-only GEPA memory preview at `/memory/gepa/preview` for redacted historical reflector evidence.
 - Artifact provenance and cache-telemetry caveat.
-- A bounded fresh-debate control path: choose `fixture:first` or `cve500:N`, preview seed provenance, then run one live attempt only when server-side live flags are enabled.
 
 The demo prompt is intentionally short:
 
@@ -39,7 +45,7 @@ Report the BARRED run pilot-v1-calibrated-pecan in concise JSON.
 
 The agent resolves the known run through a run registry without requiring the user to provide internal artifact paths. The deployed service now uses Firestore metadata pointing to private GCS artifacts; the GCS registry JSON and packaged local registry remain fallbacks.
 
-Optional cloud registry inputs are supported behind the same run-id interface:
+Cloud registry inputs are supported behind the same run-id interface:
 
 ```text
 BARRED_RUN_REGISTRY_GCS_URI=gs://gem-creation-barred-fleet-artifacts/registry/run_registry.json
@@ -50,6 +56,33 @@ BARRED_GCS_ARTIFACT_CACHE_DIR=/tmp/barred-fleet-artifacts
 ```
 
 Resolution order is Firestore document, GCS registry JSON, local registry JSON, then packaged demo fixture fallback. Artifacts referenced with `gs://` are materialized to the local cache before deterministic B-gate/eval code reads them.
+
+## Product API Surface
+
+BARRED-Fleet exposes a small product-shaped API around the demo runtime:
+
+| Route | Purpose | Live model call |
+| --- | --- | --- |
+| `GET /demo` | Browser demo surface. | No |
+| `GET /demo/report?run_id=...` | Curated artifact-backed report for the demo UI. | No |
+| `GET /seeds/manifest` | Allowlisted seed source counts and SHA-256 digests. | No |
+| `POST /runs` | Product lifecycle wrapper for dry-run or bounded fresh run requests. | Only when live flags are enabled |
+| `POST /runs/fresh-demo` | Backward-compatible demo wrapper over the same fresh-run planner/executor. | Only when live flags are enabled |
+| `GET /runs/{run_id}` | Durable run status from Firestore/local registry. | No |
+| `GET /runs/{run_id}/report` | Artifact-backed product report when artifacts exist; diagnostic report when blocked/planned. | No |
+| `GET /memory/gepa/preview` | Redacted GEPA/Pareto memory preview. | No |
+
+The report path is intentionally read-only. It never triggers a fresh debate, never mutates Cloud Run flags, and never treats missing artifacts for planned/blocked runs as a model failure.
+
+## Safety And Governance Boundaries
+
+BARRED-Fleet separates three decisions that should not be collapsed:
+
+- **Model Armor** screens selected seed text before live execution. Its authority is `content_safety_only`.
+- **Agent Gateway** checks model route/tool egress policy before live execution. Its authority is `routing_and_egress_only`.
+- **B-gate** is the only vulnerability-acceptance authority. It decides whether generated evidence is accepted.
+
+A Model Armor pass or Agent Gateway pass never means a vulnerability claim is accepted. It only means the run may proceed to the bounded debate runtime.
 
 ## Google Cloud Proof
 
@@ -92,24 +125,32 @@ For future agents or post-submission continuation:
 flowchart LR
     User["User / Judge"] --> Demo["/demo UI"]
     User --> ADK["agents-cli run"]
-    Demo --> ReportAPI["/demo/report"]
-    Demo --> FreshAPI["POST /runs/fresh-demo"]
-    ADK --> RootAgent["ADK root_agent"]
+    Demo --> DemoReport["GET /demo/report"]
+    Demo --> ProductRun["POST /runs"]
+    Demo --> FreshCompat["POST /runs/fresh-demo"]
+    Demo --> SeedManifest["GET /seeds/manifest"]
+    Demo --> MemoryPreview["GET /memory/gepa/preview"]
+    ADK --> RootAgent["Google ADK root_agent"]
     RootAgent --> Tool["report_barred_run"]
-    ReportAPI --> Tool
+    DemoReport --> Tool
     Tool --> Registry["Firestore / GCS / packaged registry"]
-    Registry --> Corpus["Curated corpus JSONL"]
-    Registry --> Attempts["Attempt artifacts JSONL"]
-    Registry --> Eval["Deterministic eval JSON"]
-    Tool --> BGate["offline_b_gate.py"]
-    Corpus --> BGate
+    Registry --> Corpus["Corpus JSONL"]
+    Registry --> Attempts["Attempts JSONL"]
+    Registry --> Eval["Deterministic eval receipt"]
+    Corpus --> BGate["Offline deterministic B-gate"]
     Attempts --> BGate
-    BGate --> Result["B-gate + verifier + routing report"]
-    FreshAPI --> Selector["Bounded seed selector"]
+    Eval --> BGate
+    BGate --> Report["Acceptance report"]
+    ProductRun --> Selector["Bounded seed selector"]
+    FreshCompat --> Selector
     Selector --> Seeds["fixture:first or cve500:N"]
-    FreshAPI --> LiveGate["Live flags + max_attempts<=1"]
+    ProductRun --> Safety["Model Armor + Agent Gateway receipts"]
+    Safety --> LiveGate["Live flags + max_attempts<=1"]
     LiveGate --> Runtime["Packaged debate runtime"]
     Runtime --> BGate
+    ProductRun --> Status["GET /runs/{run_id}"]
+    ProductRun --> ProductReport["GET /runs/{run_id}/report"]
+    ProductReport --> Report
 ```
 
 The LLM narrates the report. The B-gate decision is computed by deterministic code.
@@ -132,8 +173,10 @@ New hackathon work:
 - Dedicated Cloud Run runtime identity.
 - Run-id-only artifact resolution for the curated demo run.
 - Bounded seed selector for `fixture:first` and packaged `cve500:N` seeds.
+- Product run lifecycle routes: `POST /runs`, `GET /runs/{run_id}`, and `GET /runs/{run_id}/report`.
 - Gated fresh-debate endpoint and UI controls with dry-run-first behavior.
-- Read-only `/demo` and `/demo/report` surfaces.
+- Model Armor seed-screening receipts and Agent Gateway egress-policy receipts before live execution.
+- Read-only `/demo`, `/demo/report`, `/seeds/manifest`, and `/memory/gepa/preview` surfaces.
 - ADK eval/report fixtures and deterministic report contract.
 - Demo evidence package.
 
@@ -143,7 +186,9 @@ New hackathon work:
 - The fresh-debate path is bounded for demo safety: dry-run preview first, `max_attempts=1`, and live execution only when `BARRED_ENABLE_LIVE_FRESH_DEBATE=true` and `BARRED_START_INTERNAL_DEBATE_STACK=true`.
 - A fresh selected seed can legitimately fail B-gate; that is a truthful result, not a UI failure.
 - Graph/prefilter behavior is intentionally optional and not part of the demo claim.
-- Model Armor and Agent Gateway are implemented as guarded safety/egress receipt paths; they do not decide vulnerability acceptance. Memory Bank, Agent Registry, and long-running Agent Runtime deployment are not implemented yet.
+- Model Armor and Agent Gateway are implemented as guarded safety/egress receipt paths; they do not decide vulnerability acceptance.
+- GEPA memory is preview-only and redacted; prompt mutation/self-evolution is not enabled in Cloud Run.
+- Memory Bank, Agent Registry, full async queueing, and long-running Agent Runtime deployment are not implemented yet.
 - Cassette replay is local deterministic replay evidence, not provider-side prompt/KV cache telemetry.
 
 ## Local Setup
@@ -212,13 +257,30 @@ https://barred-fleet-837262597425.us-east1.run.app/demo
 
 The browser route requires authentication when Cloud Run is private.
 
-Fresh-debate dry-run verification:
+Fresh-debate and safety verification:
 
 ```bash
 make verify-fresh-demo
 ```
 
-This verifies `POST /runs/fresh-demo` planning and confirms live fresh execution still refuses safely unless `BARRED_ENABLE_LIVE_FRESH_DEBATE=true`.
+This verifies `POST /runs/fresh-demo` planning, safe live refusal, Model Armor seed-screening receipts, and Agent Gateway pass/block receipts without spending on a live model call.
+
+Product lifecycle verification:
+
+```bash
+make verify-product-run
+```
+
+This verifies `POST /runs`, `GET /runs/{run_id}`, and `GET /runs/{run_id}/report` in dry-run mode.
+
+GEPA memory preview verification:
+
+```bash
+make gepa-memory-preview-local
+make gepa-memory-preview-smoke
+```
+
+These verify the redacted GEPA memory preview locally and against the authenticated Cloud Run service.
 
 Fresh-debate selector examples:
 
@@ -289,7 +351,12 @@ The deploy command uses private access by default via `--no-allow-unauthenticate
 ## Files To Review
 
 - `app/agent.py`: ADK root agent and tool registration.
-- `app/run_registry.py`: local run-id to artifact resolver.
+- `app/run_registry.py`: Firestore/GCS/local run-id to artifact resolver.
+- `app/run_lifecycle.py`: product run lifecycle and artifact-backed report aggregation.
+- `app/fresh_debate.py`: bounded seed selection, dry-run planning, and live-gated fresh execution.
+- `app/model_armor.py`: Model Armor receipt boundary for seed/artifact screening.
+- `app/agent_gateway.py`: Agent Gateway receipt boundary for route/tool egress policy.
+- `app/gepa_memory.py`: redacted GEPA/Pareto memory preview compiler.
 - `app/tools.py`: deterministic BARRED report and B-gate adapters.
 - `app/demo.py`: read-only demo report and HTML rendering.
 - `app/fast_api_app.py`: FastAPI routes, ADK app wrapper, and Cloud Run entry point.
