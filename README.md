@@ -188,7 +188,8 @@ New hackathon work:
 - Graph/prefilter behavior is intentionally optional and not part of the demo claim.
 - Model Armor and Agent Gateway are implemented as guarded safety/egress receipt paths; they do not decide vulnerability acceptance.
 - GEPA memory is preview-only and redacted; prompt mutation/self-evolution is not enabled in Cloud Run.
-- Memory Bank, Agent Registry, full async queueing, and long-running Agent Runtime deployment are not implemented yet.
+- In-service async lifecycle exists through FastAPI `BackgroundTasks` for `POST /runs` with `async_mode=true`; external durable queueing via Cloud Tasks/Pub/Sub/separate workers is not implemented yet.
+- Memory Bank, Agent Registry, and long-running Agent Runtime deployment are not implemented yet. Cloud Run remains the deployment target.
 - Cassette replay is local deterministic replay evidence, not provider-side prompt/KV cache telemetry.
 
 ## Local Setup

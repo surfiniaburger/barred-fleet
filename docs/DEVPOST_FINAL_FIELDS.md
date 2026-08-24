@@ -189,12 +189,12 @@ Safety controls are deliberately scoped: Model Armor handles content-safety scre
 
 ## What's Next
 
-- Move synchronous bounded fresh runs to async cloud jobs with clearer queued/running/completed transitions.
+- Promote the current in-service `BackgroundTasks` async lifecycle to durable Cloud Tasks/Pub/Sub or a separate worker when runs become longer or higher volume.
 - Promote seed source of truth from packaged `cve500:N` files to managed GCS objects after demo stability.
 - Harden the current Agent Gateway egress receipt path into a fuller production policy with registered tools/agents.
 - Expand the current Model Armor seed-screening path to additional artifact/output boundaries.
 - Write redacted GEPA memory summaries to Firestore once the preview contract is stable.
-- Evaluate Agent Runtime, Memory Bank, Agent Registry, and richer observability once the core Cloud Run adapter is stable.
+- Evaluate long-running Agent Runtime, Memory Bank, Agent Registry, and richer observability once the Cloud Run adapter and safety receipts are stable.
 
 ## Demo Assets
 
