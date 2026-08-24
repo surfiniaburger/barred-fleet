@@ -38,6 +38,8 @@ BARRED-Fleet applies that lesson to vulnerability acceptance. Agents can debate,
 - Materializes the artifacts inside Cloud Run for deterministic evaluation.
 - Computes B-gate pass/fail using deterministic code, not model self-report.
 - Shows accepted/rejected rows, verifier parse/pass rates, model routing, deterministic eval score, and artifact provenance.
+- Uses Google Gemini in the cloud agent path: `gemini-3.6-flash` for the ADK root agent, and Vertex/Gemini defaults for bounded fresh debate (`vertex_ai/gemini-3.5-flash-lite` generator/debater, `vertex_ai/gemini-3.6-flash` judge/verifier).
+- Preserves historical Ollama routing only as provenance for the curated pre-existing fixture.
 - Provides product-shaped run routes: `POST /runs`, `GET /runs/{run_id}`, and `GET /runs/{run_id}/report`.
 - Lets a reviewer choose `fixture:first` or `cve500:N`, preview bounded seed metadata, and run a one-attempt live debate only when server-side live flags are explicitly enabled.
 - Exposes `/seeds/manifest` so seed sources are allowlisted and digest-auditable.
@@ -73,7 +75,8 @@ The ADK root agent calls `report_barred_run` with only a run ID. The tool resolv
 - Google Cloud Storage for private run artifacts
 - Firestore Native named database for run metadata
 - Cloud Logging / Trace-ready deployment configuration
-- Vertex/Gemini-compatible ADK configuration path
+- Gemini 3.6 Flash for the ADK root agent
+- Vertex/Gemini-compatible fresh debate routes: `vertex_ai/gemini-3.5-flash-lite` and `vertex_ai/gemini-3.6-flash`
 - Google Cloud Model Armor for configured seed-screening receipts
 - Google Agent Gateway / Network Services egress-governance resource and local policy adapter
 
@@ -118,7 +121,8 @@ The service was temporarily public only for browser proof capture, then returned
    - verifier parse OK: `100%`
    - verifier pass: `75%`
    - deterministic eval score: `1.0`
-   - asymmetric model routing: `ollama/gemma4:31b-cloud` and `ollama/gpt-oss:120b-cloud`
+   - current Google model path: ADK root `gemini-3.6-flash`; bounded fresh defaults `vertex_ai/gemini-3.5-flash-lite` and `vertex_ai/gemini-3.6-flash`
+   - historical curated-fixture routing: `ollama/gemma4:31b-cloud` and `ollama/gpt-oss:120b-cloud`
    - provenance chain: Firestore metadata → private GCS artifacts → deterministic B-gate → ADK narration
 7. Show the fresh seed preview:
    - choose `cve500:N` or `fixture:first`
@@ -136,8 +140,11 @@ rejected attempts: 12
 verifier parse-ok rate: 1.0
 verifier pass rate: 0.75
 deterministic eval mean score: 1.0
-generator/debater route: ollama/gemma4:31b-cloud
-judge/verifier route: ollama/gpt-oss:120b-cloud
+ADK root route: gemini-3.6-flash
+fresh generator/debater default: vertex_ai/gemini-3.5-flash-lite
+fresh judge/verifier default: vertex_ai/gemini-3.6-flash
+curated fixture generator/debater provenance: ollama/gemma4:31b-cloud
+curated fixture judge/verifier provenance: ollama/gpt-oss:120b-cloud
 ```
 
 ## What Was Newly Built During The Hackathon

@@ -28,7 +28,8 @@ It reports:
 - B-gate pass/fail.
 - Accepted and rejected attempt counts.
 - Verifier parse/pass rates.
-- Asymmetric model routing: `ollama/gemma4:31b-cloud` and `ollama/gpt-oss:120b-cloud` for the curated fixture, with Vertex/Gemini-compatible routes for bounded fresh runs.
+- Google Gemini routing: the ADK root agent uses `gemini-3.6-flash`; bounded fresh runs default to `vertex_ai/gemini-3.5-flash-lite` for generation/debate and `vertex_ai/gemini-3.6-flash` for judge/verifier roles.
+- Historical model provenance: the curated fixture preserves its original `ollama/gemma4:31b-cloud` and `ollama/gpt-oss:120b-cloud` routing as artifact evidence, not as the current Google model route.
 - Deterministic eval score and deterministic receipt presence.
 - Provenance chain: Firestore metadata → private GCS artifacts → deterministic B-gate → ADK narration.
 - Product run lifecycle: `POST /runs`, `GET /runs/{run_id}`, and `GET /runs/{run_id}/report`.
@@ -98,6 +99,8 @@ demo URL: https://barred-fleet-837262597425.us-east1.run.app/demo
 artifact bucket: gs://gem-creation-barred-fleet-artifacts
 metadata database: projects/gem-creation/databases/barred-fleet
 metadata collection: barred_runs
+ADK root model: gemini-3.6-flash
+fresh debate defaults: vertex_ai/gemini-3.5-flash-lite + vertex_ai/gemini-3.6-flash
 ```
 
 Security posture:

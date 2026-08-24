@@ -49,7 +49,8 @@ The video must show:
 - [ ] Verifier parse OK `100%`.
 - [ ] Verifier pass `75%`.
 - [ ] Deterministic eval score `1.0`.
-- [ ] Model routing: `ollama/gemma4:31b-cloud` and `ollama/gpt-oss:120b-cloud`.
+- [ ] Google model route is stated clearly: ADK root `gemini-3.6-flash`; bounded fresh defaults `vertex_ai/gemini-3.5-flash-lite` and `vertex_ai/gemini-3.6-flash`.
+- [ ] Historical curated-fixture Ollama routes are labeled as provenance only, not the current Google model route.
 - [ ] Provenance chain: Firestore metadata → private GCS artifacts → deterministic B-gate → ADK narration.
 - [ ] Explicit boundary: LLM narrates; deterministic code decides acceptance.
 - [ ] Fresh seed preview: `fixture:first` or `cve500:N` shows source, index, language, safety label, and predicate hash.
