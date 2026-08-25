@@ -23,6 +23,7 @@ from app.fresh_debate import (
     plan_fresh_debate_run,
     run_fresh_debate_async,
 )
+from app.invariant_scorecard import build_invariant_scorecard
 from app.model_armor import build_not_configured_model_armor_status
 from app.tools import build_artifact_registry, build_observability_report
 
@@ -571,17 +572,22 @@ def _product_b_gate_summary(
         artifact_report.get("b_gate") if artifact_report.get("available") else None
     )
     if isinstance(artifact_b_gate, dict) and artifact_b_gate.get("status") == "ok":
+        selected_metrics = artifact_b_gate.get("selected_metrics", {})
         return {
             "available": True,
             "passed": artifact_b_gate.get("passed"),
             "failed_checks": artifact_b_gate.get("failed_checks", []),
-            "selected_metrics": artifact_b_gate.get("selected_metrics", {}),
+            "selected_metrics": selected_metrics,
+            "invariant_scorecard": build_invariant_scorecard(selected_metrics),
         }
 
     b_gate_available = lifecycle.get("b_gate_passed") is not None
+    selected_metrics: dict[str, Any] = {}
     return {
         "available": b_gate_available,
         "passed": lifecycle.get("b_gate_passed") if b_gate_available else None,
+        "selected_metrics": selected_metrics,
+        "invariant_scorecard": build_invariant_scorecard(selected_metrics),
     }
 
 

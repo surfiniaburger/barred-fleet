@@ -33,7 +33,7 @@ BARRED-Fleet applies that lesson to vulnerability acceptance. Agents can debate,
 
 ## What It Does
 
-- Accepts a short BARRED run ID: `pilot-v1-calibrated-pecan`.
+- Accepts a short BARRED run ID: e.g. `pilot-v1-calibrated-pecan`.
 - Resolves that run through Firestore metadata to private GCS artifacts.
 - Materializes the artifacts inside Cloud Run for deterministic evaluation.
 - Computes B-gate pass/fail using deterministic code, not model self-report.

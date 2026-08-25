@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from app.invariant_scorecard import build_invariant_scorecard
 from app.tools import (
     RUN_REGISTRY_FIRESTORE_COLLECTION,
     RUN_REGISTRY_FIRESTORE_DATABASE,
@@ -40,6 +41,8 @@ def build_demo_report(run_id: str = DEMO_RUN_ID) -> dict[str, Any]:
             "passed": report.get("b_gate", {}).get("passed"),
             "failed_checks": report.get("b_gate", {}).get("failed_checks", []),
             "error": report.get("b_gate", {}).get("error"),
+            "selected_metrics": selected_metrics,
+            "invariant_scorecard": build_invariant_scorecard(selected_metrics),
             "accepted_rows": selected_metrics.get("accepted_rows"),
             "total_rows": selected_metrics.get("total_rows"),
             "verifier_parse_ok_rate": selected_metrics.get("verifier_parse_ok_rate"),
@@ -148,6 +151,7 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
     }}
     button.secondary {{ background: transparent; color: var(--accent); border: 1px solid var(--accent); }}
     button:disabled {{ cursor: not-allowed; opacity: .48; }}
+    button.loading::before {{ content: ""; display: inline-block; width: .8em; height: .8em; margin-right: .55em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; vertical-align: -0.1em; animation: spin .8s linear infinite; }}
     label {{ display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }}
     select, input {{
       width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px;
@@ -171,6 +175,7 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
     .note {{ color: var(--muted); margin-top: 12px; font-size: 14px; }}
     .ok {{ color: var(--accent); }}
     .warn {{ color: var(--warn); }}
+    @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
     @media (max-width: 850px) {{ .grid, .controls {{ grid-template-columns: 1fr; }} .wide {{ grid-column: auto; }} }}
   </style>
 </head>
@@ -206,6 +211,7 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
         </label>
         <button id="preview-seed" type="button">Preview seed metadata</button>
         <button id="run-live" class="secondary" type="button" disabled>Run bounded live debate</button>
+        <button id="refresh-live" class="secondary" type="button" disabled>Refresh latest run status</button>
       </div>
       <div id="seed-status" class="note" role="status">No seed preview loaded.</div>
       <div id="seed-metadata" class="table">Select a seed and preview metadata.</div>
@@ -226,6 +232,11 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
         <div class="note">Shows run status, accepted/rejected result, B-gate pass/fail, and Artifact promotion when available.</div>
       </article>
       <article class="card full">
+        <h2>Live Invariant Scorecard</h2>
+        <div id="live-invariant-scorecard" class="table">Run or preview a seed to see artifact-backed invariants when available.</div>
+        <div class="note">Per-run deterministic B-gate metrics only; this panel does not call models or decide acceptance.</div>
+      </article>
+      <article class="card full">
         <h2>Production Safety Controls</h2>
         <div id="safety-controls" class="table">No safety control receipt loaded.</div>
         <div class="note">Model Armor screens content safety; Agent Gateway controls model/tool egress. Neither decides vulnerability acceptance.</div>
@@ -238,6 +249,7 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
       <article class="card"><h2>Verifier Pass</h2><div id="pass" class="value">...</div></article>
       <article class="card full"><h2>Provenance Chain</h2><div id="chain" class="table">Loading...</div><div class="note">The demo path is metadata → artifacts → deterministic gate → agent narration.</div></article>
       <article class="card wide"><h2>Decision Breakdown</h2><div id="decisions" class="table">Loading...</div></article>
+      <article class="card wide"><h2>Invariant Scorecard</h2><div id="invariant-scorecard" class="table">Loading...</div></article>
       <article class="card wide"><h2>Asymmetric Debate Routing</h2><div id="routing" class="table">Loading...</div></article>
       <article class="card wide"><h2>Deterministic Eval</h2><div id="eval" class="table">Loading...</div></article>
       <article class="card full"><h2>Artifact Provenance</h2><div id="provenance" class="table">Loading...</div><div class="note">Artifact facts are computed by deterministic tools; the model only narrates the report.</div></article>
@@ -248,7 +260,33 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
     const fmt = (value) => value === null || value === undefined ? "n/a" : value;
     const pct = (value) => value === null || value === undefined ? "n/a" : `${{Math.round(value * 100)}}%`;
     const rows = (items) => items.map(([label, value]) => `<div class="row"><span>${{esc(label)}}</span><span>${{esc(fmt(value))}}</span></div>`).join("");
+    const invariantValue = (row) => row.format === "percent" ? pct(row.value) : fmt(row.value);
+    function renderInvariantScorecard(target, scorecard) {{
+      const panel = document.querySelector(target);
+      if (!panel) return;
+      if (!scorecard?.available) {{
+        panel.innerHTML = rows([
+          ["Status", "not available"],
+          ["Reason", scorecard?.reason || "pending final B-gate artifacts"],
+        ]);
+        return;
+      }}
+      panel.innerHTML = rows((scorecard.rows || []).map((row) => [
+        row.label || row.key,
+        `${{invariantValue(row)}} · ${{row.direction || "context"}} · ${{row.key}}`,
+      ]));
+    }}
+    const TERMINAL_RUN_STATES = ["completed", "blocked", "failed"];
     let lastPlannedSeedId = null;
+    let latestRunId = null;
+    function setButtonLoading(button, isLoading, text) {{
+      if (!button) return;
+      if (!button.dataset.defaultText) button.dataset.defaultText = button.textContent;
+      button.disabled = isLoading;
+      button.classList.toggle("loading", isLoading);
+      button.setAttribute("aria-busy", isLoading ? "true" : "false");
+      button.textContent = isLoading ? text : button.dataset.defaultText;
+    }}
     const selectedSeedId = () => {{
       const family = document.querySelector("#seed-family").value;
       if (family === "fixture:first") return "fixture:first";
@@ -307,18 +345,34 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
         ["Live gates", (policy.live_execution?.requires_env || []).join(" + ")],
       ]);
     }}
+    async function refreshLatestRunStatus() {{
+      if (!latestRunId) return null;
+      const report = await loadProductRunReport(latestRunId);
+      renderLiveResult(report);
+      const lifecycle = report?.lifecycle || null;
+      const liveButton = document.querySelector("#run-live");
+      if (TERMINAL_RUN_STATES.includes(lifecycle?.status)) {{
+        liveButton.disabled = false;
+      }} else {{
+        liveButton.disabled = true;
+        document.querySelector("#seed-status").textContent = "Still running; refresh status.";
+      }}
+      return lifecycle;
+    }}
     async function pollRunStatus(runId) {{
       let latest = null;
-      for (let attempt = 0; attempt < 12; attempt += 1) {{
+      const maxAttempts = 80;
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {{
         const response = await fetch(`/runs/${{encodeURIComponent(runId)}}`, {{
           headers: {{ "accept": "application/json" }},
         }});
         if (!response.ok) throw new Error(`HTTP ${{response.status}}`);
         latest = await response.json();
         renderLiveResult(await loadProductRunReport(runId), latest);
-        if (!["queued", "running"].includes(latest.status)) return latest;
+        if (TERMINAL_RUN_STATES.includes(latest.status)) return latest;
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }}
+      document.querySelector("#seed-status").textContent = `Still running after 120s. Use Refresh latest run status.`;
       return latest;
     }}
     function lifecycleLabel(data, reportData) {{
@@ -378,6 +432,7 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
         ["Agent Gateway", reportData?.agent_gateway?.status || "not_configured"],
         ["Message", data.error || promotion.reason || artifactReport.error || data.fresh_report?.status || lifecycleLabel(data, reportData)],
       ]);
+      renderInvariantScorecard("#live-invariant-scorecard", bGate.invariant_scorecard);
       renderSafetyControls(reportData, lifecycleData);
     }}
     function renderSafetyControls(reportData, lifecycleData = {{}}) {{
@@ -418,8 +473,10 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
       }}
       const metadata = data.seed_metadata || {{}};
       lastPlannedSeedId = metadata.seed_id;
+      latestRunId = null;
       document.querySelector("#seed-status").textContent = `Planned ${{metadata.seed_id}} without loading live debate.`;
       document.querySelector("#run-live").disabled = false;
+      document.querySelector("#refresh-live").disabled = true;
       renderSeedMetadata(metadata);
       renderLiveResult(null, data);
     }}
@@ -433,7 +490,10 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
         return;
       }}
       const liveButton = document.querySelector("#run-live");
-      liveButton.disabled = true;
+      const refreshButton = document.querySelector("#refresh-live");
+      let keepLiveDisabled = false;
+      setButtonLoading(liveButton, true, "Running bounded live debate");
+      refreshButton.disabled = true;
       document.querySelector("#live-result").innerHTML = rows([
         ["Run status", "starting"],
         ["Lifecycle phase", "Starting"],
@@ -441,12 +501,24 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
       ]);
       try {{
         const data = await requestFreshDebate(false);
+        latestRunId = data.run_id || null;
+        refreshButton.disabled = !latestRunId;
         renderLiveResult(await loadProductRunReport(data.run_id), data);
         if (data.run_id && data.status === "queued") {{
-          await pollRunStatus(data.run_id);
+          const finalStatus = await pollRunStatus(data.run_id);
+          if (!TERMINAL_RUN_STATES.includes(finalStatus?.status)) {{
+            keepLiveDisabled = true;
+            liveButton.disabled = true;
+            document.querySelector("#live-result").innerHTML += rows([
+              ["Next action", "Still running; refresh status"],
+            ]);
+          }}
+          return;
         }}
       }} finally {{
-        liveButton.disabled = false;
+        setButtonLoading(liveButton, false);
+        liveButton.disabled = keepLiveDisabled;
+        if (latestRunId) refreshButton.disabled = false;
       }}
     }}
     async function loadReport() {{
@@ -473,6 +545,7 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
         ["Rejected rows", decisions.rejected],
         ["Attempt rows", data.attempts.row_count],
       ]);
+      renderInvariantScorecard("#invariant-scorecard", data.b_gate.invariant_scorecard);
       document.querySelector("#routing").innerHTML = rows([
         ["Generator/debater lane", `${{fmt(calls["ollama/gemma4:31b-cloud"])}} calls · ollama/gemma4:31b-cloud`],
         ["Judge lane", `${{fmt(calls["ollama/gpt-oss:120b-cloud"])}} calls · ollama/gpt-oss:120b-cloud`],
@@ -503,6 +576,13 @@ def build_demo_html(*, service_title: str = "BARRED-Fleet") -> str:
       runLiveDebate().catch((error) => {{
         document.querySelector("#live-result").textContent = error.stack || String(error);
       }});
+    }});
+    document.querySelector("#refresh-live").addEventListener("click", () => {{
+      const refreshButton = document.querySelector("#refresh-live");
+      setButtonLoading(refreshButton, true, "Refreshing latest run");
+      refreshLatestRunStatus().catch((error) => {{
+        document.querySelector("#live-result").textContent = error.stack || String(error);
+      }}).finally(() => setButtonLoading(refreshButton, false));
     }});
     loadReport().catch((error) => {{
       document.querySelector("#gate").textContent = "ERROR";

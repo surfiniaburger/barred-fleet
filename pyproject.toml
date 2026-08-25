@@ -3,11 +3,11 @@ name = "barred-fleet"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Your Name", email = "your@email.com"},
+    {name = "Adedoyinsola Ogungbesan", email = "ade@in-varia.com"},
 ]
 
 dependencies = [
-    "google-adk[gcp,otel-gcp]>=2.5.0,<3.0.0",
+    "google-adk[gcp,otel-gcp]>=2.6.0,<3.0.0",
     "opentelemetry-resourcedetector-gcp<=1.12.0a0",
     "gcsfs>=2024.11.0",
     "a2a-sdk[http-server]>=1.0,<2",

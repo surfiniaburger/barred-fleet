@@ -35,12 +35,6 @@ variable "telemetry_logs_filter" {
   default     = "labels.service_name=\"barred-fleet\" labels.type=\"agent_telemetry\""
 }
 
-variable "feedback_logs_filter" {
-  type        = string
-  description = "Log Sink filter for capturing feedback data. Captures logs where the `log_type` field is `feedback`."
-  default     = "jsonPayload.log_type=\"feedback\" jsonPayload.service_name=\"barred-fleet\""
-}
-
 variable "app_sa_roles" {
   description = "List of roles to assign to the application service account"
   type        = list(string)

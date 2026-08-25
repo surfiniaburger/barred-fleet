@@ -445,7 +445,10 @@ def test_product_run_report_describes_blocked_diagnostic_receipt() -> None:
     assert response["model_routes"]["generator"] == "gemini-3.5-flash-lite"
     assert response["safety_policy"]["status"] == "enforced"
     assert response["safety_receipt"]["status"] == "enforced"
-    assert response["b_gate"] == {"available": False, "passed": None}
+    assert response["b_gate"]["available"] is False
+    assert response["b_gate"]["passed"] is None
+    assert response["b_gate"]["selected_metrics"] == {}
+    assert response["b_gate"]["invariant_scorecard"]["available"] is False
     assert response["diagnostic"]["available"] is True
     assert response["diagnostic"]["path"].startswith("gs://barred-demo-artifacts/")
     assert response["promotion"]["status"] == "not_promoted"
@@ -494,7 +497,10 @@ def test_product_run_report_describes_completed_promoted_artifacts() -> None:
     assert response["safety_receipt"]["status"] == "enforced"
     assert response["model_armor"]["status"] == "not_configured"
     assert response["agent_gateway"]["status"] == "not_configured"
-    assert response["b_gate"] == {"available": True, "passed": True}
+    assert response["b_gate"]["available"] is True
+    assert response["b_gate"]["passed"] is True
+    assert response["b_gate"]["selected_metrics"] == {}
+    assert response["b_gate"]["invariant_scorecard"]["available"] is False
     assert response["deterministic_eval"]["available"] is True
     assert response["promotion"]["reason"] == "gcs_and_firestore_written"
     assert response["provenance"]["chain"][-1]["step"] == (
@@ -645,6 +651,13 @@ def test_product_run_report_enriches_local_artifacts(tmp_path: Path) -> None:
     assert response["b_gate"]["selected_metrics"]["accepted_rows"] == 1
     assert response["b_gate"]["selected_metrics"]["verifier_parse_ok_rate"] == 1.0
     assert response["b_gate"]["selected_metrics"]["verifier_pass_rate"] == 0.5
+    assert response["b_gate"]["invariant_scorecard"]["available"] is True
+    assert any(
+        row["key"] == "verifier_pass_rate"
+        and row["value"] == 0.5
+        and row["format"] == "percent"
+        for row in response["b_gate"]["invariant_scorecard"]["rows"]
+    )
     assert response["deterministic_eval"]["available"] is True
     assert response["deterministic_eval"]["score"] == 1.0
     assert response["safety_policy"]["status"] == "enforced"
@@ -759,6 +772,7 @@ def test_product_run_report_prefers_promoted_gcs_paths(monkeypatch) -> None:
     assert response["artifact_registry"]["diagnostic_receipt"]["available"] is False
     assert response["artifact_report"]["available"] is True
     assert response["b_gate"]["selected_metrics"]["accepted_rows"] == 1
+    assert response["b_gate"]["invariant_scorecard"]["available"] is True
     assert response["deterministic_eval"]["score"] == 1.0
 
 
@@ -809,7 +823,11 @@ def test_product_run_report_route_reads_planned_status(monkeypatch) -> None:
     assert payload["lifecycle"]["status"] == "planned"
     assert payload["safety_policy"]["status"] == "enforced"
     assert payload["safety_receipt"]["status"] == "enforced"
-    assert payload["b_gate"] == {"available": False, "passed": None}
+    assert payload["b_gate"]["available"] is False
+    assert payload["b_gate"]["passed"] is None
+    assert payload["b_gate"]["selected_metrics"] == {}
+    assert payload["b_gate"]["invariant_scorecard"]["available"] is False
+    assert payload["b_gate"]["invariant_scorecard"]["reason"] == "no_b_gate_metrics"
     assert payload["artifact_report"]["available"] is False
     assert payload["artifact_report"]["reason"] == (
         "planned_run_has_no_final_artifacts"

@@ -1,5 +1,5 @@
 name: barred-fleet
-acli_version: 1.3.1
+acli_version: 1.4.1
 agent_directory: app
 region: us-east1
 base_template: adk

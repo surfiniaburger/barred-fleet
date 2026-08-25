@@ -15,6 +15,21 @@ def test_build_demo_report_returns_curated_b_gate_summary() -> None:
     assert report["b_gate"]["passed"] is True
     assert report["b_gate"]["accepted_rows"] == 5
     assert report["b_gate"]["verifier_parse_ok_rate"] == 1.0
+    assert report["b_gate"]["selected_metrics"]["accepted_rows"] == 5
+    scorecard = report["b_gate"]["invariant_scorecard"]
+    assert scorecard["available"] is True
+    assert scorecard["rows"][0] == {
+        "key": "total_rows",
+        "label": "Total accepted corpus rows",
+        "format": "integer",
+        "direction": "context",
+        "value": 5,
+        "available": True,
+    }
+    assert any(
+        row["key"] == "accepted_corpus_logic_error_rate"
+        for row in scorecard["rows"]
+    )
     assert report["deterministic_eval"]["score"] == 1.0
     assert report["model_armor"]["status"] == "not_configured"
     assert report["agent_gateway"]["status"] == "not_configured"
@@ -109,8 +124,21 @@ def test_build_demo_html_contains_no_external_asset_dependencies() -> None:
     assert "requestFreshDebate(true)" in html
     assert "requestFreshDebate(false)" in html
     assert "Run bounded live debate" in html
+    assert "Refresh latest run status" in html
+    assert "const maxAttempts = 80" in html
+    assert "Still running after 120s" in html
+    assert "Still running; refresh status" in html
+    assert "setButtonLoading(liveButton, true" in html
+    assert "Running bounded live debate" in html
+    assert "refreshLatestRunStatus()" in html
+    assert "TERMINAL_RUN_STATES" in html
+    assert "TERMINAL_RUN_STATES.includes(lifecycle?.status)" in html
     assert "Live Debate Result" in html
     assert "Production Safety Controls" in html
+    assert "Live Invariant Scorecard" in html
+    assert "Invariant Scorecard" in html
+    assert "renderInvariantScorecard" in html
+    assert "Per-run deterministic B-gate metrics only" in html
     assert "Model Armor screens content safety" in html
     assert "Agent Gateway controls model/tool egress" in html
     assert "renderSafetyControls(reportData, lifecycleData)" in html
@@ -158,6 +186,18 @@ def test_demo_report_endpoint_returns_curated_report() -> None:
     assert payload["b_gate"]["total_rows"] == 5
     assert payload["b_gate"]["verifier_parse_ok_rate"] == 1.0
     assert payload["b_gate"]["verifier_pass_rate"] == 0.75
+    assert payload["b_gate"]["selected_metrics"]["accepted_rows"] == 5
+    assert payload["b_gate"]["invariant_scorecard"]["available"] is True
+    assert {
+        row["key"] for row in payload["b_gate"]["invariant_scorecard"]["rows"]
+    } >= {
+        "b0_structural_completeness_pass_rate",
+        "b1_unsupported_in_accepted_rate",
+        "b1_inconclusive_in_accepted_rate",
+        "b2_anchor_match_rate",
+        "accepted_attempt_logic_error_rate",
+        "accepted_corpus_logic_error_rate",
+    }
     assert payload["deterministic_eval"]["score"] == 1.0
     assert payload["model_armor"]["status"] == "not_configured"
     assert payload["agent_gateway"]["status"] == "not_configured"
