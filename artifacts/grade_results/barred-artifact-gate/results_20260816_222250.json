@@ -1,0 +1,753 @@
+{
+  "eval_case_results": [
+    {
+      "eval_case_index": 0,
+      "response_candidate_results": [
+        {
+          "response_index": 0,
+          "metric_results": {
+            "custom_response_quality": {
+              "metric_name": "custom_response_quality",
+              "score": null,
+              "explanation": null,
+              "rubric_verdicts": null,
+              "raw_output": null,
+              "error_message": "CustomFunctionError(evaluate): 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.', 'status': 'RESOURCE_EXHAUSTED'}}"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "summary_metrics": [
+    {
+      "metric_name": "custom_response_quality",
+      "num_cases_total": 1,
+      "num_cases_valid": 0,
+      "num_cases_error": 1,
+      "mean_score": null,
+      "stdev_score": null,
+      "pass_rate": null
+    }
+  ],
+  "win_rates": null,
+  "evaluation_dataset": [
+    {
+      "bigquery_source": null,
+      "gcs_source": null,
+      "eval_cases": [
+        {
+          "prompt": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Use only deterministic BARRED artifact tools. Summarize barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl, then run the B-gate on barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl with attempts_path barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl and min_verifier_parse_ok_rate 1.0. Report whether the gate passed, the accepted row count, verifier parse-ok rate, verifier pass rate, and explicitly say cassette replay is not provider-side cache telemetry.",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null,
+                "audio_transcription": null
+              }
+            ],
+            "role": "user"
+          },
+          "responses": [
+            {
+              "response": {
+                "parts": [
+                  {
+                    "media_resolution": null,
+                    "code_execution_result": null,
+                    "executable_code": null,
+                    "file_data": null,
+                    "function_call": null,
+                    "function_response": null,
+                    "inline_data": null,
+                    "text": "### BARRED Artifact Summary & B-Gate Verification Report\n\n#### Artifact Summary\n- **Attempts Artifact:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\n- **Total Rows:** 1\n- **Accepted Decisions:** 1\n- **Verifier Calls:** 1 (Passes audit: 1)\n\n---\n\n#### B-Gate Results\n- **Corpus Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl`\n- **Attempts Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\n- **Gate Passed:** **YES** (`pass: true`)\n- **Accepted Row Count:** **1**\n- **Verifier Parse-OK Rate:** **1.0** (100%)\n- **Verifier Pass Rate:** **1.0** (100%)\n\n---\n\n*Note: Cassette replay is not provider-side cache telemetry.*",
+                    "thought": null,
+                    "thought_signature": null,
+                    "video_metadata": null,
+                    "tool_call": null,
+                    "tool_response": null,
+                    "part_metadata": null,
+                    "audio_transcription": null
+                  }
+                ],
+                "role": "model"
+              }
+            }
+          ],
+          "reference": {
+            "response": {
+              "parts": [
+                {
+                  "media_resolution": null,
+                  "code_execution_result": null,
+                  "executable_code": null,
+                  "file_data": null,
+                  "function_call": null,
+                  "function_response": null,
+                  "inline_data": null,
+                  "text": "The B-gate passed with 1 accepted row, verifier_parse_ok_rate 1.0, and verifier_pass_rate 1.0. Cassette replay is not provider-side cache telemetry.",
+                  "thought": null,
+                  "thought_signature": null,
+                  "video_metadata": null,
+                  "tool_call": null,
+                  "tool_response": null,
+                  "part_metadata": null,
+                  "audio_transcription": null
+                }
+              ],
+              "role": "model"
+            }
+          },
+          "system_instruction": null,
+          "conversation_history": null,
+          "rubric_groups": null,
+          "eval_case_id": "barred_smoke_artifact_gate",
+          "intermediate_events": null,
+          "agent_info": null,
+          "agent_data": {
+            "agents": {
+              "root_agent": {
+                "agent_id": "root_agent",
+                "agent_type": "LlmAgent",
+                "description": "",
+                "instruction": "You are BARRED-Fleet, an adapter over the BARRED security-evidence harness. Use deterministic tools for artifact facts. Do not invent missing metrics, and do not describe cassette replay as provider-side cache telemetry.",
+                "tools": [
+                  {
+                    "retrieval": null,
+                    "computer_use": null,
+                    "file_search": null,
+                    "google_search": null,
+                    "google_maps": null,
+                    "code_execution": null,
+                    "enterprise_web_search": null,
+                    "function_declarations": [
+                      {
+                        "description": "Summarize BARRED run artifacts without calling a model.\n\nArgs:\n    attempts_path: Path to an attempts JSONL artifact, relative to the BARRED repo root.\n    checkpoint_path: Path to a checkpoint JSON artifact, relative to the BARRED repo root.\n    record_path: Path to a run-record JSON artifact, relative to the BARRED repo root.\n    cassette_path: Path to a cassette JSON artifact, relative to the BARRED repo root.\n\nReturns:\n    A deterministic summary of artifact existence, counts, decisions, and verifier metadata.",
+                        "name": "summarize_artifacts",
+                        "parameters": null,
+                        "parameters_json_schema": {
+                          "properties": {
+                            "attempts_path": {
+                              "default": "",
+                              "title": "Attempts Path",
+                              "type": "string"
+                            },
+                            "checkpoint_path": {
+                              "default": "",
+                              "title": "Checkpoint Path",
+                              "type": "string"
+                            },
+                            "record_path": {
+                              "default": "",
+                              "title": "Record Path",
+                              "type": "string"
+                            },
+                            "cassette_path": {
+                              "default": "",
+                              "title": "Cassette Path",
+                              "type": "string"
+                            }
+                          },
+                          "title": "summarize_artifactsParams",
+                          "type": "object"
+                        },
+                        "response": null,
+                        "response_json_schema": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "behavior": null
+                      }
+                    ],
+                    "google_search_retrieval": null,
+                    "parallel_ai_search": null,
+                    "url_context": null,
+                    "mcp_servers": null,
+                    "exa_ai_search": null
+                  },
+                  {
+                    "retrieval": null,
+                    "computer_use": null,
+                    "file_search": null,
+                    "google_search": null,
+                    "google_maps": null,
+                    "code_execution": null,
+                    "enterprise_web_search": null,
+                    "function_declarations": [
+                      {
+                        "description": "Run BARRED offline B-gate metrics over corpus and attempt artifacts.\n\nArgs:\n    input_path: Path to the training corpus JSONL artifact, relative to the BARRED repo root.\n    attempts_path: Optional path to attempts JSONL, relative to the BARRED repo root.\n    max_unsupported_rate: Maximum allowed unsupported predicate rate.\n    max_inconclusive_rate: Maximum allowed inconclusive predicate rate.\n    min_anchor_match_rate: Minimum required anchor match rate.\n    min_verifier_pass_rate: Minimum required verifier pass rate when attempts are supplied.\n    min_verifier_parse_ok_rate: Minimum required verifier parse-ok rate when attempts are supplied.\n    max_accepted_logic_error_rate: Maximum allowed accepted logic-error rate.\n\nReturns:\n    B-gate pass/fail status, failed checks, selected metrics, and full metrics.",
+                        "name": "run_b_gate",
+                        "parameters": null,
+                        "parameters_json_schema": {
+                          "properties": {
+                            "input_path": {
+                              "title": "Input Path",
+                              "type": "string"
+                            },
+                            "attempts_path": {
+                              "default": "",
+                              "title": "Attempts Path",
+                              "type": "string"
+                            },
+                            "max_unsupported_rate": {
+                              "default": 0.05,
+                              "title": "Max Unsupported Rate",
+                              "type": "number"
+                            },
+                            "max_inconclusive_rate": {
+                              "default": 0.2,
+                              "title": "Max Inconclusive Rate",
+                              "type": "number"
+                            },
+                            "min_anchor_match_rate": {
+                              "default": 0.8,
+                              "title": "Min Anchor Match Rate",
+                              "type": "number"
+                            },
+                            "min_verifier_pass_rate": {
+                              "default": 0.0,
+                              "title": "Min Verifier Pass Rate",
+                              "type": "number"
+                            },
+                            "min_verifier_parse_ok_rate": {
+                              "default": 0.0,
+                              "title": "Min Verifier Parse Ok Rate",
+                              "type": "number"
+                            },
+                            "max_accepted_logic_error_rate": {
+                              "default": 0.0,
+                              "title": "Max Accepted Logic Error Rate",
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "input_path"
+                          ],
+                          "title": "run_b_gateParams",
+                          "type": "object"
+                        },
+                        "response": null,
+                        "response_json_schema": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "behavior": null
+                      }
+                    ],
+                    "google_search_retrieval": null,
+                    "parallel_ai_search": null,
+                    "url_context": null,
+                    "mcp_servers": null,
+                    "exa_ai_search": null
+                  },
+                  {
+                    "retrieval": null,
+                    "computer_use": null,
+                    "file_search": null,
+                    "google_search": null,
+                    "google_maps": null,
+                    "code_execution": null,
+                    "enterprise_web_search": null,
+                    "function_declarations": [
+                      {
+                        "description": "Run one BARRED debate case through the existing local A2A judge.\n\nThe BARRED debate stack must already be running, for example with\n`uv run agentbeats-run scenarios/debate/barred_test.toml --serve-only`.\n\nArgs:\n    code: Candidate code snippet or patch to debate.\n    predicate: Specific vulnerability claim to evaluate.\n    run_id: Stable run identifier for artifacts.\n    seed: Deterministic seed passed through to BARRED.\n    mode: BARRED cassette mode, either record or replay.\n    judge_url: Existing BARRED judge A2A endpoint.\n    target_verdict: Target verdict expected by BARRED generation.\n    target_dimension: Evaluation dimension metadata.\n    num_rounds: Number of pro/con debate rounds.\n    max_refinements: Maximum BARRED refinement rounds.\n    output_file: Existing BARRED accepted-corpus output path.\n    attempts_path: Existing BARRED attempts JSONL path.\n    checkpoint_path: Existing BARRED checkpoint path.\n    record_path: Existing BARRED run-record path.\n    cassette_path: Existing BARRED cassette path.\n    clock_now: Optional fixed timestamp for deterministic records.\n    resume: Whether the existing judge should resume from checkpoint.\n\nReturns:\n    Status, response excerpt, context id, artifact paths, and payload controls.",
+                        "name": "run_debate_case",
+                        "parameters": null,
+                        "parameters_json_schema": {
+                          "properties": {
+                            "code": {
+                              "title": "Code",
+                              "type": "string"
+                            },
+                            "predicate": {
+                              "title": "Predicate",
+                              "type": "string"
+                            },
+                            "run_id": {
+                              "default": "barred-fleet-adhoc",
+                              "title": "Run Id",
+                              "type": "string"
+                            },
+                            "seed": {
+                              "default": 42,
+                              "title": "Seed",
+                              "type": "integer"
+                            },
+                            "mode": {
+                              "default": "record",
+                              "title": "Mode",
+                              "type": "string"
+                            },
+                            "judge_url": {
+                              "default": "http://127.0.0.1:9009",
+                              "title": "Judge Url",
+                              "type": "string"
+                            },
+                            "target_verdict": {
+                              "default": "True",
+                              "title": "Target Verdict",
+                              "type": "string"
+                            },
+                            "target_dimension": {
+                              "default": "Security Invariants",
+                              "title": "Target Dimension",
+                              "type": "string"
+                            },
+                            "num_rounds": {
+                              "default": 2,
+                              "title": "Num Rounds",
+                              "type": "integer"
+                            },
+                            "max_refinements": {
+                              "default": 1,
+                              "title": "Max Refinements",
+                              "type": "integer"
+                            },
+                            "output_file": {
+                              "default": "training_corpus.jsonl",
+                              "title": "Output File",
+                              "type": "string"
+                            },
+                            "attempts_path": {
+                              "default": "",
+                              "title": "Attempts Path",
+                              "type": "string"
+                            },
+                            "checkpoint_path": {
+                              "default": "",
+                              "title": "Checkpoint Path",
+                              "type": "string"
+                            },
+                            "record_path": {
+                              "default": "",
+                              "title": "Record Path",
+                              "type": "string"
+                            },
+                            "cassette_path": {
+                              "default": "",
+                              "title": "Cassette Path",
+                              "type": "string"
+                            },
+                            "clock_now": {
+                              "default": "",
+                              "title": "Clock Now",
+                              "type": "string"
+                            },
+                            "resume": {
+                              "default": false,
+                              "title": "Resume",
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "predicate"
+                          ],
+                          "title": "run_debate_caseParams",
+                          "type": "object"
+                        },
+                        "response": null,
+                        "response_json_schema": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "behavior": null
+                      }
+                    ],
+                    "google_search_retrieval": null,
+                    "parallel_ai_search": null,
+                    "url_context": null,
+                    "mcp_servers": null,
+                    "exa_ai_search": null
+                  }
+                ],
+                "sub_agents": []
+              }
+            },
+            "turns": [
+              {
+                "turn_index": 0,
+                "turn_id": "turn_0",
+                "events": [
+                  {
+                    "author": "root_agent",
+                    "content": {
+                      "parts": [
+                        {
+                          "media_resolution": null,
+                          "code_execution_result": null,
+                          "executable_code": null,
+                          "file_data": null,
+                          "function_call": {
+                            "id": "call_1791239",
+                            "args": {
+                              "attempts_path": "barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl"
+                            },
+                            "name": "summarize_artifacts",
+                            "partial_args": null,
+                            "will_continue": null
+                          },
+                          "function_response": null,
+                          "inline_data": null,
+                          "text": null,
+                          "thought": null,
+                          "thought_signature": null,
+                          "video_metadata": null,
+                          "tool_call": null,
+                          "tool_response": null,
+                          "part_metadata": null,
+                          "audio_transcription": null
+                        }
+                      ],
+                      "role": "model"
+                    },
+                    "event_time": null,
+                    "state_delta": null,
+                    "active_tools": null
+                  },
+                  {
+                    "author": "root_agent",
+                    "content": {
+                      "parts": [
+                        {
+                          "media_resolution": null,
+                          "code_execution_result": null,
+                          "executable_code": null,
+                          "file_data": null,
+                          "function_call": null,
+                          "function_response": {
+                            "will_continue": null,
+                            "scheduling": null,
+                            "parts": null,
+                            "id": "call_1791239",
+                            "name": "summarize_artifacts",
+                            "response": {
+                              "status": "ok",
+                              "artifact_count": 1,
+                              "artifacts": {
+                                "attempts": {
+                                  "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl",
+                                  "exists": true,
+                                  "row_count": 1,
+                                  "decisions": {
+                                    "accepted": 1
+                                  },
+                                  "pre_filter_stages": {},
+                                  "verifier": {
+                                    "rows": 1,
+                                    "called": 1,
+                                    "passes_audit": 1
+                                  }
+                                }
+                              },
+                              "notes": [
+                                "Summary is computed from deterministic artifact files only.",
+                                "Cassette entries are local replay records, not provider-side cache telemetry."
+                              ]
+                            }
+                          },
+                          "inline_data": null,
+                          "text": null,
+                          "thought": null,
+                          "thought_signature": null,
+                          "video_metadata": null,
+                          "tool_call": null,
+                          "tool_response": null,
+                          "part_metadata": null,
+                          "audio_transcription": null
+                        }
+                      ],
+                      "role": "user"
+                    },
+                    "event_time": null,
+                    "state_delta": null,
+                    "active_tools": null
+                  },
+                  {
+                    "author": "root_agent",
+                    "content": {
+                      "parts": [
+                        {
+                          "media_resolution": null,
+                          "code_execution_result": null,
+                          "executable_code": null,
+                          "file_data": null,
+                          "function_call": {
+                            "id": "call_374528",
+                            "args": {
+                              "attempts_path": "barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl",
+                              "input_path": "barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl",
+                              "min_verifier_parse_ok_rate": 1
+                            },
+                            "name": "run_b_gate",
+                            "partial_args": null,
+                            "will_continue": null
+                          },
+                          "function_response": null,
+                          "inline_data": null,
+                          "text": null,
+                          "thought": null,
+                          "thought_signature": null,
+                          "video_metadata": null,
+                          "tool_call": null,
+                          "tool_response": null,
+                          "part_metadata": null,
+                          "audio_transcription": null
+                        }
+                      ],
+                      "role": "model"
+                    },
+                    "event_time": null,
+                    "state_delta": null,
+                    "active_tools": null
+                  },
+                  {
+                    "author": "root_agent",
+                    "content": {
+                      "parts": [
+                        {
+                          "media_resolution": null,
+                          "code_execution_result": null,
+                          "executable_code": null,
+                          "file_data": null,
+                          "function_call": null,
+                          "function_response": {
+                            "will_continue": null,
+                            "scheduling": null,
+                            "parts": null,
+                            "id": "call_374528",
+                            "name": "run_b_gate",
+                            "response": {
+                              "status": "ok",
+                              "passed": true,
+                              "failed_checks": [],
+                              "selected_metrics": {
+                                "total_rows": 1,
+                                "accepted_rows": 1,
+                                "b0_structural_completeness_pass_rate": 1.0,
+                                "b1_unsupported_in_accepted_rate": 0.0,
+                                "b1_inconclusive_in_accepted_rate": 0.0,
+                                "b2_anchor_match_rate": 1.0,
+                                "verifier_parse_ok_rate": 1.0,
+                                "verifier_pass_rate": 1.0,
+                                "accepted_attempt_logic_error_rate": 0.0,
+                                "accepted_corpus_logic_error_rate": 0.0
+                              },
+                              "metrics": {
+                                "input_path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl",
+                                "attempts_path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl",
+                                "total_rows": 1,
+                                "accepted_rows": 1,
+                                "failures": [],
+                                "b0_structural_completeness_pass_rate": 1.0,
+                                "b1_unsupported_in_accepted_rate": 0.0,
+                                "b1_inconclusive_in_accepted_rate": 0.0,
+                                "b2_anchor_match_rate": 1.0,
+                                "b2_generic_anchor_fraction": 0.0,
+                                "b1_unsupported_predicate_rate": 0.0,
+                                "b1_inconclusive_predicate_rate": 0.0,
+                                "attempts_total": 1,
+                                "b2_predicate_aboutness_fail_rate": 0.0,
+                                "b2_predicate_aboutness_total": 1,
+                                "predicate_quality_fail_rate": 0.0,
+                                "predicate_quality_total": 1,
+                                "b2_mechanism_grounding_fail_rate": 0.0,
+                                "b2_mechanism_grounding_total": 1,
+                                "verifier_called_rate": 1.0,
+                                "verifier_called_on_prowin_rate": 1.0,
+                                "prowin_total": 1,
+                                "verifier_parse_ok_rate": 1.0,
+                                "verifier_pass_rate": 1.0,
+                                "accepted_with_not_applicable_rate": 0.0,
+                                "accepted_attempt_logic_error_count": 0,
+                                "accepted_attempt_logic_error_rate": 0.0,
+                                "accepted_corpus_logic_error_count": 0,
+                                "accepted_corpus_logic_error_rate": 0.0,
+                                "accepted_logic_error_examples": [],
+                                "disagreement_judge_accept_but_verifier_missing_or_parse_fail_count": 0,
+                                "disagreement_verifier_pass_but_anchor_strict_fail_count": 0,
+                                "b2_strict_fail_rate": 0.0,
+                                "b2_strict_total": 1,
+                                "b2_strict_failures": {
+                                  "anchors_too_few_after_normalization": 0,
+                                  "anchors_no_match": 0,
+                                  "mechanism_evidence_failed": 0
+                                },
+                                "usage_calls_total": 4,
+                                "usage_prompt_tokens_total": 100,
+                                "usage_completion_tokens_total": 50,
+                                "usage_total_tokens_total": 150,
+                                "usage_cost_usd_total": 0.0,
+                                "usage_missing_usage_calls_total": 0,
+                                "usage_by_stage_totals": {
+                                  "debate": {
+                                    "calls": 2,
+                                    "prompt_tokens": 50,
+                                    "completion_tokens": 30,
+                                    "total_tokens": 80,
+                                    "cost_usd": 0.0
+                                  },
+                                  "verifier": {
+                                    "calls": 1,
+                                    "prompt_tokens": 30,
+                                    "completion_tokens": 10,
+                                    "total_tokens": 40,
+                                    "cost_usd": 0.0
+                                  },
+                                  "judge": {
+                                    "calls": 1,
+                                    "prompt_tokens": 20,
+                                    "completion_tokens": 10,
+                                    "total_tokens": 30,
+                                    "cost_usd": 0.0
+                                  }
+                                },
+                                "usage_by_model_totals": {
+                                  "ollama/gemma4:31b-cloud": {
+                                    "calls": 2,
+                                    "prompt_tokens": 50,
+                                    "completion_tokens": 30,
+                                    "total_tokens": 80,
+                                    "cost_usd": 0.0
+                                  },
+                                  "ollama/gpt-oss:120b-cloud": {
+                                    "calls": 2,
+                                    "prompt_tokens": 50,
+                                    "completion_tokens": 20,
+                                    "total_tokens": 70,
+                                    "cost_usd": 0.0
+                                  }
+                                },
+                                "usage_by_source_totals": {
+                                  "provider": 4
+                                },
+                                "usage_by_source_rates": {
+                                  "provider": 1.0
+                                },
+                                "efficiency_tokens_per_accepted_row": 150.0,
+                                "efficiency_cost_per_accepted_row": 0.0,
+                                "efficiency_tokens_per_attempt": 150.0,
+                                "efficiency_cost_per_attempt": 0.0,
+                                "efficiency_tokens_per_verifier_called_attempt": 150.0,
+                                "efficiency_cost_per_verifier_called_attempt": 0.0,
+                                "generation_config_values": {
+                                  "temperature": [
+                                    0
+                                  ]
+                                },
+                                "generation_config_missing_attempts": 0,
+                                "thresholds": {
+                                  "max_unsupported_in_accepted_rate": 0.05,
+                                  "max_inconclusive_in_accepted_rate": 0.2,
+                                  "min_anchor_match_rate": 0.8,
+                                  "min_verifier_pass_rate": 0.0,
+                                  "min_verifier_parse_ok_rate": 1,
+                                  "max_accepted_logic_error_rate": 0.0,
+                                  "max_cost_per_accepted_row": null,
+                                  "max_tokens_per_accepted_row": null
+                                },
+                                "checks": {
+                                  "max_unsupported_in_accepted_rate": true,
+                                  "max_inconclusive_in_accepted_rate": true,
+                                  "min_anchor_match_rate": true,
+                                  "min_verifier_pass_rate": true,
+                                  "min_verifier_parse_ok_rate": true,
+                                  "max_accepted_logic_error_rate": true,
+                                  "max_cost_per_accepted_row": true,
+                                  "max_tokens_per_accepted_row": true
+                                },
+                                "anti_gaming_valid": true,
+                                "anti_gaming_violations": [],
+                                "pass": true
+                              }
+                            }
+                          },
+                          "inline_data": null,
+                          "text": null,
+                          "thought": null,
+                          "thought_signature": null,
+                          "video_metadata": null,
+                          "tool_call": null,
+                          "tool_response": null,
+                          "part_metadata": null,
+                          "audio_transcription": null
+                        }
+                      ],
+                      "role": "user"
+                    },
+                    "event_time": null,
+                    "state_delta": null,
+                    "active_tools": null
+                  },
+                  {
+                    "author": "root_agent",
+                    "content": {
+                      "parts": [
+                        {
+                          "media_resolution": null,
+                          "code_execution_result": null,
+                          "executable_code": null,
+                          "file_data": null,
+                          "function_call": null,
+                          "function_response": null,
+                          "inline_data": null,
+                          "text": "### BARRED Artifact Summary & B-Gate Verification Report\n\n#### Artifact Summary\n- **Attempts Artifact:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\n- **Total Rows:** 1\n- **Accepted Decisions:** 1\n- **Verifier Calls:** 1 (Passes audit: 1)\n\n---\n\n#### B-Gate Results\n- **Corpus Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl`\n- **Attempts Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\n- **Gate Passed:** **YES** (`pass: true`)\n- **Accepted Row Count:** **1**\n- **Verifier Parse-OK Rate:** **1.0** (100%)\n- **Verifier Pass Rate:** **1.0** (100%)\n\n---\n\n*Note: Cassette replay is not provider-side cache telemetry.*",
+                          "thought": null,
+                          "thought_signature": null,
+                          "video_metadata": null,
+                          "tool_call": null,
+                          "tool_response": null,
+                          "part_metadata": null,
+                          "audio_transcription": null
+                        }
+                      ],
+                      "role": "model"
+                    },
+                    "event_time": null,
+                    "state_delta": null,
+                    "active_tools": null
+                  }
+                ]
+              }
+            ]
+          },
+          "user_scenario": null
+        }
+      ],
+      "eval_dataset_df": null,
+      "candidate_name": null
+    }
+  ],
+  "metadata": {
+    "candidate_names": [
+      "candidate_1"
+    ],
+    "dataset_name": null,
+    "dataset_id": null,
+    "creation_timestamp": "2026-08-16T21:22:50.148810Z",
+    "dataset": [
+      {
+        "prompt_display_text": "Use only deterministic BARRED artifact tools. Summarize barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl, then run the B-gate on barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl with attempts_path barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl and min_verifier_parse_ok_rate 1.0. Report whether the gate passed, the accepted row count, verifier parse-ok rate, verifier pass rate, and explicitly say cassette replay is not provider-side cache telemetry.",
+        "prompt_raw_json": "{\n  \"parts\": [\n    {\n      \"text\": \"Use only deterministic BARRED artifact tools. Summarize barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl, then run the B-gate on barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl with attempts_path barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl and min_verifier_parse_ok_rate 1.0. Report whether the gate passed, the accepted row count, verifier parse-ok rate, verifier pass rate, and explicitly say cassette replay is not provider-side cache telemetry.\"\n    }\n  ],\n  \"role\": \"user\"\n}",
+        "reference": "The B-gate passed with 1 accepted row, verifier_parse_ok_rate 1.0, and verifier_pass_rate 1.0. Cassette replay is not provider-side cache telemetry.",
+        "reference_raw_json": "{\n  \"parts\": [\n    {\n      \"text\": \"The B-gate passed with 1 accepted row, verifier_parse_ok_rate 1.0, and verifier_pass_rate 1.0. Cassette replay is not provider-side cache telemetry.\"\n    }\n  ],\n  \"role\": \"model\"\n}",
+        "response_display_text": "### BARRED Artifact Summary & B-Gate Verification Report\n\n#### Artifact Summary\n- **Attempts Artifact:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\n- **Total Rows:** 1\n- **Accepted Decisions:** 1\n- **Verifier Calls:** 1 (Passes audit: 1)\n\n---\n\n#### B-Gate Results\n- **Corpus Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl`\n- **Attempts Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\n- **Gate Passed:** **YES** (`pass: true`)\n- **Accepted Row Count:** **1**\n- **Verifier Parse-OK Rate:** **1.0** (100%)\n- **Verifier Pass Rate:** **1.0** (100%)\n\n---\n\n*Note: Cassette replay is not provider-side cache telemetry.*",
+        "response_raw_json": "{\n  \"parts\": [\n    {\n      \"text\": \"### BARRED Artifact Summary & B-Gate Verification Report\\n\\n#### Artifact Summary\\n- **Attempts Artifact:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\\n- **Total Rows:** 1\\n- **Accepted Decisions:** 1\\n- **Verifier Calls:** 1 (Passes audit: 1)\\n\\n---\\n\\n#### B-Gate Results\\n- **Corpus Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl`\\n- **Attempts Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\\n- **Gate Passed:** **YES** (`pass: true`)\\n- **Accepted Row Count:** **1**\\n- **Verifier Parse-OK Rate:** **1.0** (100%)\\n- **Verifier Pass Rate:** **1.0** (100%)\\n\\n---\\n\\n*Note: Cassette replay is not provider-side cache telemetry.*\"\n    }\n  ],\n  \"role\": \"model\"\n}",
+        "intermediate_events": null,
+        "agent_data": "{\"agents\": {\"root_agent\": {\"agent_id\": \"root_agent\", \"agent_type\": \"LlmAgent\", \"description\": \"\", \"instruction\": \"You are BARRED-Fleet, an adapter over the BARRED security-evidence harness. Use deterministic tools for artifact facts. Do not invent missing metrics, and do not describe cassette replay as provider-side cache telemetry.\", \"tools\": [{\"function_declarations\": [{\"description\": \"Summarize BARRED run artifacts without calling a model.\\n\\nArgs:\\n    attempts_path: Path to an attempts JSONL artifact, relative to the BARRED repo root.\\n    checkpoint_path: Path to a checkpoint JSON artifact, relative to the BARRED repo root.\\n    record_path: Path to a run-record JSON artifact, relative to the BARRED repo root.\\n    cassette_path: Path to a cassette JSON artifact, relative to the BARRED repo root.\\n\\nReturns:\\n    A deterministic summary of artifact existence, counts, decisions, and verifier metadata.\", \"name\": \"summarize_artifacts\", \"parameters_json_schema\": {\"properties\": {\"attempts_path\": {\"default\": \"\", \"title\": \"Attempts Path\", \"type\": \"string\"}, \"checkpoint_path\": {\"default\": \"\", \"title\": \"Checkpoint Path\", \"type\": \"string\"}, \"record_path\": {\"default\": \"\", \"title\": \"Record Path\", \"type\": \"string\"}, \"cassette_path\": {\"default\": \"\", \"title\": \"Cassette Path\", \"type\": \"string\"}}, \"title\": \"summarize_artifactsParams\", \"type\": \"object\"}, \"response_json_schema\": {\"additionalProperties\": true, \"type\": \"object\"}}]}, {\"function_declarations\": [{\"description\": \"Run BARRED offline B-gate metrics over corpus and attempt artifacts.\\n\\nArgs:\\n    input_path: Path to the training corpus JSONL artifact, relative to the BARRED repo root.\\n    attempts_path: Optional path to attempts JSONL, relative to the BARRED repo root.\\n    max_unsupported_rate: Maximum allowed unsupported predicate rate.\\n    max_inconclusive_rate: Maximum allowed inconclusive predicate rate.\\n    min_anchor_match_rate: Minimum required anchor match rate.\\n    min_verifier_pass_rate: Minimum required verifier pass rate when attempts are supplied.\\n    min_verifier_parse_ok_rate: Minimum required verifier parse-ok rate when attempts are supplied.\\n    max_accepted_logic_error_rate: Maximum allowed accepted logic-error rate.\\n\\nReturns:\\n    B-gate pass/fail status, failed checks, selected metrics, and full metrics.\", \"name\": \"run_b_gate\", \"parameters_json_schema\": {\"properties\": {\"input_path\": {\"title\": \"Input Path\", \"type\": \"string\"}, \"attempts_path\": {\"default\": \"\", \"title\": \"Attempts Path\", \"type\": \"string\"}, \"max_unsupported_rate\": {\"default\": 0.05, \"title\": \"Max Unsupported Rate\", \"type\": \"number\"}, \"max_inconclusive_rate\": {\"default\": 0.2, \"title\": \"Max Inconclusive Rate\", \"type\": \"number\"}, \"min_anchor_match_rate\": {\"default\": 0.8, \"title\": \"Min Anchor Match Rate\", \"type\": \"number\"}, \"min_verifier_pass_rate\": {\"default\": 0.0, \"title\": \"Min Verifier Pass Rate\", \"type\": \"number\"}, \"min_verifier_parse_ok_rate\": {\"default\": 0.0, \"title\": \"Min Verifier Parse Ok Rate\", \"type\": \"number\"}, \"max_accepted_logic_error_rate\": {\"default\": 0.0, \"title\": \"Max Accepted Logic Error Rate\", \"type\": \"number\"}}, \"required\": [\"input_path\"], \"title\": \"run_b_gateParams\", \"type\": \"object\"}, \"response_json_schema\": {\"additionalProperties\": true, \"type\": \"object\"}}]}, {\"function_declarations\": [{\"description\": \"Run one BARRED debate case through the existing local A2A judge.\\n\\nThe BARRED debate stack must already be running, for example with\\n`uv run agentbeats-run scenarios/debate/barred_test.toml --serve-only`.\\n\\nArgs:\\n    code: Candidate code snippet or patch to debate.\\n    predicate: Specific vulnerability claim to evaluate.\\n    run_id: Stable run identifier for artifacts.\\n    seed: Deterministic seed passed through to BARRED.\\n    mode: BARRED cassette mode, either record or replay.\\n    judge_url: Existing BARRED judge A2A endpoint.\\n    target_verdict: Target verdict expected by BARRED generation.\\n    target_dimension: Evaluation dimension metadata.\\n    num_rounds: Number of pro/con debate rounds.\\n    max_refinements: Maximum BARRED refinement rounds.\\n    output_file: Existing BARRED accepted-corpus output path.\\n    attempts_path: Existing BARRED attempts JSONL path.\\n    checkpoint_path: Existing BARRED checkpoint path.\\n    record_path: Existing BARRED run-record path.\\n    cassette_path: Existing BARRED cassette path.\\n    clock_now: Optional fixed timestamp for deterministic records.\\n    resume: Whether the existing judge should resume from checkpoint.\\n\\nReturns:\\n    Status, response excerpt, context id, artifact paths, and payload controls.\", \"name\": \"run_debate_case\", \"parameters_json_schema\": {\"properties\": {\"code\": {\"title\": \"Code\", \"type\": \"string\"}, \"predicate\": {\"title\": \"Predicate\", \"type\": \"string\"}, \"run_id\": {\"default\": \"barred-fleet-adhoc\", \"title\": \"Run Id\", \"type\": \"string\"}, \"seed\": {\"default\": 42, \"title\": \"Seed\", \"type\": \"integer\"}, \"mode\": {\"default\": \"record\", \"title\": \"Mode\", \"type\": \"string\"}, \"judge_url\": {\"default\": \"http://127.0.0.1:9009\", \"title\": \"Judge Url\", \"type\": \"string\"}, \"target_verdict\": {\"default\": \"True\", \"title\": \"Target Verdict\", \"type\": \"string\"}, \"target_dimension\": {\"default\": \"Security Invariants\", \"title\": \"Target Dimension\", \"type\": \"string\"}, \"num_rounds\": {\"default\": 2, \"title\": \"Num Rounds\", \"type\": \"integer\"}, \"max_refinements\": {\"default\": 1, \"title\": \"Max Refinements\", \"type\": \"integer\"}, \"output_file\": {\"default\": \"training_corpus.jsonl\", \"title\": \"Output File\", \"type\": \"string\"}, \"attempts_path\": {\"default\": \"\", \"title\": \"Attempts Path\", \"type\": \"string\"}, \"checkpoint_path\": {\"default\": \"\", \"title\": \"Checkpoint Path\", \"type\": \"string\"}, \"record_path\": {\"default\": \"\", \"title\": \"Record Path\", \"type\": \"string\"}, \"cassette_path\": {\"default\": \"\", \"title\": \"Cassette Path\", \"type\": \"string\"}, \"clock_now\": {\"default\": \"\", \"title\": \"Clock Now\", \"type\": \"string\"}, \"resume\": {\"default\": false, \"title\": \"Resume\", \"type\": \"boolean\"}}, \"required\": [\"code\", \"predicate\"], \"title\": \"run_debate_caseParams\", \"type\": \"object\"}, \"response_json_schema\": {\"additionalProperties\": true, \"type\": \"object\"}}]}], \"sub_agents\": []}}, \"turns\": [{\"turn_index\": 0, \"turn_id\": \"turn_0\", \"events\": [{\"author\": \"root_agent\", \"content\": {\"parts\": [{\"function_call\": {\"id\": \"call_1791239\", \"args\": {\"attempts_path\": \"barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl\"}, \"name\": \"summarize_artifacts\"}}], \"role\": \"model\"}}, {\"author\": \"root_agent\", \"content\": {\"parts\": [{\"function_response\": {\"id\": \"call_1791239\", \"name\": \"summarize_artifacts\", \"response\": {\"status\": \"ok\", \"artifact_count\": 1, \"artifacts\": {\"attempts\": {\"path\": \"/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl\", \"exists\": true, \"row_count\": 1, \"decisions\": {\"accepted\": 1}, \"pre_filter_stages\": {}, \"verifier\": {\"rows\": 1, \"called\": 1, \"passes_audit\": 1}}}, \"notes\": [\"Summary is computed from deterministic artifact files only.\", \"Cassette entries are local replay records, not provider-side cache telemetry.\"]}}}], \"role\": \"user\"}}, {\"author\": \"root_agent\", \"content\": {\"parts\": [{\"function_call\": {\"id\": \"call_374528\", \"args\": {\"attempts_path\": \"barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl\", \"input_path\": \"barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl\", \"min_verifier_parse_ok_rate\": 1}, \"name\": \"run_b_gate\"}}], \"role\": \"model\"}}, {\"author\": \"root_agent\", \"content\": {\"parts\": [{\"function_response\": {\"id\": \"call_374528\", \"name\": \"run_b_gate\", \"response\": {\"status\": \"ok\", \"passed\": true, \"failed_checks\": [], \"selected_metrics\": {\"total_rows\": 1, \"accepted_rows\": 1, \"b0_structural_completeness_pass_rate\": 1.0, \"b1_unsupported_in_accepted_rate\": 0.0, \"b1_inconclusive_in_accepted_rate\": 0.0, \"b2_anchor_match_rate\": 1.0, \"verifier_parse_ok_rate\": 1.0, \"verifier_pass_rate\": 1.0, \"accepted_attempt_logic_error_rate\": 0.0, \"accepted_corpus_logic_error_rate\": 0.0}, \"metrics\": {\"input_path\": \"/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl\", \"attempts_path\": \"/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl\", \"total_rows\": 1, \"accepted_rows\": 1, \"failures\": [], \"b0_structural_completeness_pass_rate\": 1.0, \"b1_unsupported_in_accepted_rate\": 0.0, \"b1_inconclusive_in_accepted_rate\": 0.0, \"b2_anchor_match_rate\": 1.0, \"b2_generic_anchor_fraction\": 0.0, \"b1_unsupported_predicate_rate\": 0.0, \"b1_inconclusive_predicate_rate\": 0.0, \"attempts_total\": 1, \"b2_predicate_aboutness_fail_rate\": 0.0, \"b2_predicate_aboutness_total\": 1, \"predicate_quality_fail_rate\": 0.0, \"predicate_quality_total\": 1, \"b2_mechanism_grounding_fail_rate\": 0.0, \"b2_mechanism_grounding_total\": 1, \"verifier_called_rate\": 1.0, \"verifier_called_on_prowin_rate\": 1.0, \"prowin_total\": 1, \"verifier_parse_ok_rate\": 1.0, \"verifier_pass_rate\": 1.0, \"accepted_with_not_applicable_rate\": 0.0, \"accepted_attempt_logic_error_count\": 0, \"accepted_attempt_logic_error_rate\": 0.0, \"accepted_corpus_logic_error_count\": 0, \"accepted_corpus_logic_error_rate\": 0.0, \"accepted_logic_error_examples\": [], \"disagreement_judge_accept_but_verifier_missing_or_parse_fail_count\": 0, \"disagreement_verifier_pass_but_anchor_strict_fail_count\": 0, \"b2_strict_fail_rate\": 0.0, \"b2_strict_total\": 1, \"b2_strict_failures\": {\"anchors_too_few_after_normalization\": 0, \"anchors_no_match\": 0, \"mechanism_evidence_failed\": 0}, \"usage_calls_total\": 4, \"usage_prompt_tokens_total\": 100, \"usage_completion_tokens_total\": 50, \"usage_total_tokens_total\": 150, \"usage_cost_usd_total\": 0.0, \"usage_missing_usage_calls_total\": 0, \"usage_by_stage_totals\": {\"debate\": {\"calls\": 2, \"prompt_tokens\": 50, \"completion_tokens\": 30, \"total_tokens\": 80, \"cost_usd\": 0.0}, \"verifier\": {\"calls\": 1, \"prompt_tokens\": 30, \"completion_tokens\": 10, \"total_tokens\": 40, \"cost_usd\": 0.0}, \"judge\": {\"calls\": 1, \"prompt_tokens\": 20, \"completion_tokens\": 10, \"total_tokens\": 30, \"cost_usd\": 0.0}}, \"usage_by_model_totals\": {\"ollama/gemma4:31b-cloud\": {\"calls\": 2, \"prompt_tokens\": 50, \"completion_tokens\": 30, \"total_tokens\": 80, \"cost_usd\": 0.0}, \"ollama/gpt-oss:120b-cloud\": {\"calls\": 2, \"prompt_tokens\": 50, \"completion_tokens\": 20, \"total_tokens\": 70, \"cost_usd\": 0.0}}, \"usage_by_source_totals\": {\"provider\": 4}, \"usage_by_source_rates\": {\"provider\": 1.0}, \"efficiency_tokens_per_accepted_row\": 150.0, \"efficiency_cost_per_accepted_row\": 0.0, \"efficiency_tokens_per_attempt\": 150.0, \"efficiency_cost_per_attempt\": 0.0, \"efficiency_tokens_per_verifier_called_attempt\": 150.0, \"efficiency_cost_per_verifier_called_attempt\": 0.0, \"generation_config_values\": {\"temperature\": [0]}, \"generation_config_missing_attempts\": 0, \"thresholds\": {\"max_unsupported_in_accepted_rate\": 0.05, \"max_inconclusive_in_accepted_rate\": 0.2, \"min_anchor_match_rate\": 0.8, \"min_verifier_pass_rate\": 0.0, \"min_verifier_parse_ok_rate\": 1, \"max_accepted_logic_error_rate\": 0.0, \"max_cost_per_accepted_row\": null, \"max_tokens_per_accepted_row\": null}, \"checks\": {\"max_unsupported_in_accepted_rate\": true, \"max_inconclusive_in_accepted_rate\": true, \"min_anchor_match_rate\": true, \"min_verifier_pass_rate\": true, \"min_verifier_parse_ok_rate\": true, \"max_accepted_logic_error_rate\": true, \"max_cost_per_accepted_row\": true, \"max_tokens_per_accepted_row\": true}, \"anti_gaming_valid\": true, \"anti_gaming_violations\": [], \"pass\": true}}}}], \"role\": \"user\"}}, {\"author\": \"root_agent\", \"content\": {\"parts\": [{\"text\": \"### BARRED Artifact Summary & B-Gate Verification Report\\n\\n#### Artifact Summary\\n- **Attempts Artifact:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\\n- **Total Rows:** 1\\n- **Accepted Decisions:** 1\\n- **Verifier Calls:** 1 (Passes audit: 1)\\n\\n---\\n\\n#### B-Gate Results\\n- **Corpus Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_corpus.jsonl`\\n- **Attempts Path:** `barred-fleet/tests/fixtures/adk_smoke_cloud/adk_smoke_attempts.jsonl`\\n- **Gate Passed:** **YES** (`pass: true`)\\n- **Accepted Row Count:** **1**\\n- **Verifier Parse-OK Rate:** **1.0** (100%)\\n- **Verifier Pass Rate:** **1.0** (100%)\\n\\n---\\n\\n*Note: Cassette replay is not provider-side cache telemetry.*\"}], \"role\": \"model\"}}]}]}"
+      }
+    ]
+  },
+  "agent_info": null
+}

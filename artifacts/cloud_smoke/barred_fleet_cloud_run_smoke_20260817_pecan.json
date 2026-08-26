@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-08-17T02:55:03.755879+00:00",
+  "service_url": "https://barred-fleet-hkistjqfqa-ue.a.run.app",
+  "run_id": "pilot-v1-calibrated-pecan",
+  "http_status": 200,
+  "model_versions": [
+    "gemini-3.6-flash"
+  ],
+  "tool_calls": [
+    {
+      "name": "report_barred_run",
+      "args": {
+        "input_path": "training_corpus_calibrated_pecan.jsonl",
+        "run_id": "pilot-v1-calibrated-pecan",
+        "attempts_path": "artifacts/attempts/pilot-v1-calibrated-pecan.jsonl",
+        "min_verifier_parse_ok_rate": 1,
+        "deterministic_eval_result_path": "barred-fleet/tests/fixtures/pecan_demo/deterministic_eval_result.json"
+      }
+    }
+  ],
+  "tool_responses": [
+    {
+      "name": "report_barred_run",
+      "status": "ok",
+      "b_gate_passed": true,
+      "accepted_rows": 5,
+      "verifier_parse_ok_rate": 1.0,
+      "verifier_pass_rate": 0.75,
+      "report_checks": {
+        "artifacts_read": true,
+        "b_gate_passed": true,
+        "verifier_parse_ok_rate_met": true,
+        "deterministic_eval_present": true
+      }
+    }
+  ],
+  "final_text_excerpt": "Here is the deterministic observability report for **`pilot-v1-calibrated-pecan`**:\n\n* **Status:** `ok`\n* **B-Gate Pass Status:** `Passed` (`passed: true`)\n* **Accepted Row Count:** `5`\n* **Verifier Parse-OK Rate:** `1.0` (100%)\n* **Verifier Pass Rate:** `0.75` (75%)\n* **Deterministic Eval Score:** `1.0` (Metric: `barred_report_contract`, `mean_score: 1`)\n* **Model Routing Summary:**\n  * **`ollama/gpt-oss:120b-cloud`:** 50 calls across attempts, 17 verifier evaluations\n  * **`ollama/gemma4:31b-cloud`:** 24 calls across attempts"
+}

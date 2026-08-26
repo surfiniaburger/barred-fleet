@@ -1,0 +1,864 @@
+{
+  "eval_cases": [
+    {
+      "prompt": {
+        "parts": [
+          {
+            "text": "Run a security debate audit on the following code for the predicate: \"The code is vulnerable to key‑material leakage because the expanded key buffers (enc_expkey and dec_expkey) are never explicitly zeroed when a crypto_tfm is freed or the module is unloaded\"\n\n```c\n/*\n\n * Glue Code for assembler optimized version of 3DES\n\n *\n\n * Copyright © 2014 Jussi Kivilinna <jussi.kivilinna@mbnet.fi>\n\n *\n\n * CBC & ECB parts based on code (crypto/cbc.c,ecb.c) by:\n\n *   Copyright (c) 2006 Herbert Xu <herbert@gondor.apana.org.au>\n\n * CTR part based on code (crypto/ctr.c) by:\n\n *   (C) Copyright IBM Corp. 2007 - Joy Latten <latten@us.ibm.com>\n\n *\n\n * This program is free software; you can redistribute it and/or modify\n\n * it under the terms of the GNU General Public License as published by\n\n * the Free Software Foundation; either version 2 of the License, or\n\n * (at your option) any later version.\n\n *\n\n * This program is distributed in the hope that it will be useful,\n\n * but WITHOUT ANY WARRANTY; without even the implied warranty of\n\n * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n\n * GNU General Public License for more details.\n\n *\n\n */\n\n\n\n#include <asm/processor.h>\n\n#include <crypto/des.h>\n\n#include <linux/crypto.h>\n\n#include <linux/init.h>\n\n#include <linux/module.h>\n\n#include <linux/types.h>\n\n#include <crypto/algapi.h>\n\n\n\nstruct des3_ede_x86_ctx {\n\n\tu32 enc_expkey[DES3_EDE_EXPKEY_WORDS];\n\n\tu32 dec_expkey[DES3_EDE_EXPKEY_WORDS];\n\n};\n\n\n\n/* regular block cipher functions */\n\nasmlinkage void des3_ede_x86_64_crypt_blk(const u32 *expkey, u8 *dst,\n\n\t\t\t\t\t  const u8 *src);\n\n\n\n/* 3-way parallel cipher functions */\n\nasmlinkage void des3_ede_x86_64_crypt_blk_3way(const u32 *expkey, u8 *dst,\n\n\t\t\t\t\t       const u8 *src);\n\n\n\nstatic inline void des3_ede_enc_blk(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t    const u8 *src)\n\n{\n\n\tu32 *enc_ctx = ctx->enc_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk(enc_ctx, dst, src);\n\n}\n\n\n\nstatic inline void des3_ede_dec_blk(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t    const u8 *src)\n\n{\n\n\tu32 *dec_ctx = ctx->dec_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk(dec_ctx, dst, src);\n\n}\n\n\n\nstatic inline void des3_ede_enc_blk_3way(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t\t const u8 *src)\n\n{\n\n\tu32 *enc_ctx = ctx->enc_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk_3way(enc_ctx, dst, src);\n\n}\n\n\n\nstatic inline void des3_ede_dec_blk_3way(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t\t const u8 *src)\n\n{\n\n\tu32 *dec_ctx = ctx->dec_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk_3way(dec_ctx, dst, src);\n\n}\n\n\n\nstatic void des3_ede_x86_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)\n\n{\n\n\tdes3_ede_enc_blk(crypto_tfm_ctx(tfm), dst, src);\n\n}\n\n\n\nstatic void des3_ede_x86_decrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)\n\n{\n\n\tdes3_ede_dec_blk(crypto_tfm_ctx(tfm), dst, src);\n\n}\n\n\n\nstatic int ecb_crypt(struct blkcipher_desc *desc, struct blkcipher_walk *walk,\n\n\t\t     const u32 *expkey)\n\n{\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes;\n\n\tint err;\n\n\n\n\terr = blkcipher_walk_virt(desc, walk);\n\n\n\n\twhile ((nbytes = walk->nbytes)) {\n\n\t\tu8 *wsrc = walk->src.virt.addr;\n\n\t\tu8 *wdst = walk->dst.virt.addr;\n\n\n\n\t\t/* Process four block batch */\n\n\t\tif (nbytes >= bsize * 3) {\n\n\t\t\tdo {\n\n\t\t\t\tdes3_ede_x86_64_crypt_blk_3way(expkey, wdst,\n\n\t\t\t\t\t\t\t       wsrc);\n\n\n\n\t\t\t\twsrc += bsize * 3;\n\n\t\t\t\twdst += bsize * 3;\n\n\t\t\t\tnbytes -= bsize * 3;\n\n\t\t\t} while (nbytes >= bsize * 3);\n\n\n\n\t\t\tif (nbytes < bsize)\n\n\t\t\t\tgoto done;\n\n\t\t}\n\n\n\n\t\t/* Handle leftovers */\n\n\t\tdo {\n\n\t\t\tdes3_ede_x86_64_crypt_blk(expkey, wdst, wsrc);\n\n\n\n\t\t\twsrc += bsize;\n\n\t\t\twdst += bsize;\n\n\t\t\tnbytes -= bsize;\n\n\t\t} while (nbytes >= bsize);\n\n\n\ndone:\n\n\t\terr = blkcipher_walk_done(desc, walk, nbytes);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic int ecb_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tstruct blkcipher_walk walk;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\treturn ecb_crypt(desc, &walk, ctx->enc_expkey);\n\n}\n\n\n\nstatic int ecb_decrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tstruct blkcipher_walk walk;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\treturn ecb_crypt(desc, &walk, ctx->dec_expkey);\n\n}\n\n\n\nstatic unsigned int __cbc_encrypt(struct blkcipher_desc *desc,\n\n\t\t\t\t  struct blkcipher_walk *walk)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\tu64 *src = (u64 *)walk->src.virt.addr;\n\n\tu64 *dst = (u64 *)walk->dst.virt.addr;\n\n\tu64 *iv = (u64 *)walk->iv;\n\n\n\n\tdo {\n\n\t\t*dst = *src ^ *iv;\n\n\t\tdes3_ede_enc_blk(ctx, (u8 *)dst, (u8 *)dst);\n\n\t\tiv = dst;\n\n\n\n\t\tsrc += 1;\n\n\t\tdst += 1;\n\n\t\tnbytes -= bsize;\n\n\t} while (nbytes >= bsize);\n\n\n\n\t*(u64 *)walk->iv = *iv;\n\n\treturn nbytes;\n\n}\n\n\n\nstatic int cbc_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct blkcipher_walk walk;\n\n\tint err;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\terr = blkcipher_walk_virt(desc, &walk);\n\n\n\n\twhile ((nbytes = walk.nbytes)) {\n\n\t\tnbytes = __cbc_encrypt(desc, &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, nbytes);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic unsigned int __cbc_decrypt(struct blkcipher_desc *desc,\n\n\t\t\t\t  struct blkcipher_walk *walk)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\tu64 *src = (u64 *)walk->src.virt.addr;\n\n\tu64 *dst = (u64 *)walk->dst.virt.addr;\n\n\tu64 ivs[3 - 1];\n\n\tu64 last_iv;\n\n\n\n\t/* Start of the last block. */\n\n\tsrc += nbytes / bsize - 1;\n\n\tdst += nbytes / bsize - 1;\n\n\n\n\tlast_iv = *src;\n\n\n\n\t/* Process four block batch */\n\n\tif (nbytes >= bsize * 3) {\n\n\t\tdo {\n\n\t\t\tnbytes -= bsize * 3 - bsize;\n\n\t\t\tsrc -= 3 - 1;\n\n\t\t\tdst -= 3 - 1;\n\n\n\n\t\t\tivs[0] = src[0];\n\n\t\t\tivs[1] = src[1];\n\n\n\n\t\t\tdes3_ede_dec_blk_3way(ctx, (u8 *)dst, (u8 *)src);\n\n\n\n\t\t\tdst[1] ^= ivs[0];\n\n\t\t\tdst[2] ^= ivs[1];\n\n\n\n\t\t\tnbytes -= bsize;\n\n\t\t\tif (nbytes < bsize)\n\n\t\t\t\tgoto done;\n\n\n\n\t\t\t*dst ^= *(src - 1);\n\n\t\t\tsrc -= 1;\n\n\t\t\tdst -= 1;\n\n\t\t} while (nbytes >= bsize * 3);\n\n\t}\n\n\n\n\t/* Handle leftovers */\n\n\tfor (;;) {\n\n\t\tdes3_ede_dec_blk(ctx, (u8 *)dst, (u8 *)src);\n\n\n\n\t\tnbytes -= bsize;\n\n\t\tif (nbytes < bsize)\n\n\t\t\tbreak;\n\n\n\n\t\t*dst ^= *(src - 1);\n\n\t\tsrc -= 1;\n\n\t\tdst -= 1;\n\n\t}\n\n\n\ndone:\n\n\t*dst ^= *(u64 *)walk->iv;\n\n\t*(u64 *)walk->iv = last_iv;\n\n\n\n\treturn nbytes;\n\n}\n\n\n\nstatic int cbc_decrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct blkcipher_walk walk;\n\n\tint err;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\terr = blkcipher_walk_virt(desc, &walk);\n\n\n\n\twhile ((nbytes = walk.nbytes)) {\n\n\t\tnbytes = __cbc_decrypt(desc, &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, nbytes);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic void ctr_crypt_final(struct des3_ede_x86_ctx *ctx,\n\n\t\t\t    struct blkcipher_walk *walk)\n\n{\n\n\tu8 *ctrblk = walk->iv;\n\n\tu8 keystream[DES3_EDE_BLOCK_SIZE];\n\n\tu8 *src = walk->src.virt.addr;\n\n\tu8 *dst = walk->dst.virt.addr;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\n\n\tdes3_ede_enc_blk(ctx, keystream, ctrblk);\n\n\tcrypto_xor(keystream, src, nbytes);\n\n\tmemcpy(dst, keystream, nbytes);\n\n\n\n\tcrypto_inc(ctrblk, DES3_EDE_BLOCK_SIZE);\n\n}\n\n\n\nstatic unsigned int __ctr_crypt(struct blkcipher_desc *desc,\n\n\t\t\t\tstruct blkcipher_walk *walk)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\t__be64 *src = (__be64 *)walk->src.virt.addr;\n\n\t__be64 *dst = (__be64 *)walk->dst.virt.addr;\n\n\tu64 ctrblk = be64_to_cpu(*(__be64 *)walk->iv);\n\n\t__be64 ctrblocks[3];\n\n\n\n\t/* Process four block batch */\n\n\tif (nbytes >= bsize * 3) {\n\n\t\tdo {\n\n\t\t\t/* create ctrblks for parallel encrypt */\n\n\t\t\tctrblocks[0] = cpu_to_be64(ctrblk++);\n\n\t\t\tctrblocks[1] = cpu_to_be64(ctrblk++);\n\n\t\t\tctrblocks[2] = cpu_to_be64(ctrblk++);\n\n\n\n\t\t\tdes3_ede_enc_blk_3way(ctx, (u8 *)ctrblocks,\n\n\t\t\t\t\t      (u8 *)ctrblocks);\n\n\n\n\t\t\tdst[0] = src[0] ^ ctrblocks[0];\n\n\t\t\tdst[1] = src[1] ^ ctrblocks[1];\n\n\t\t\tdst[2] = src[2] ^ ctrblocks[2];\n\n\n\n\t\t\tsrc += 3;\n\n\t\t\tdst += 3;\n\n\t\t} while ((nbytes -= bsize * 3) >= bsize * 3);\n\n\n\n\t\tif (nbytes < bsize)\n\n\t\t\tgoto done;\n\n\t}\n\n\n\n\t/* Handle leftovers */\n\n\tdo {\n\n\t\tctrblocks[0] = cpu_to_be64(ctrblk++);\n\n\n\n\t\tdes3_ede_enc_blk(ctx, (u8 *)ctrblocks, (u8 *)ctrblocks);\n\n\n\n\t\tdst[0] = src[0] ^ ctrblocks[0];\n\n\n\n\t\tsrc += 1;\n\n\t\tdst += 1;\n\n\t} while ((nbytes -= bsize) >= bsize);\n\n\n\ndone:\n\n\t*(__be64 *)walk->iv = cpu_to_be64(ctrblk);\n\n\treturn nbytes;\n\n}\n\n\n\nstatic int ctr_crypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t     struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct blkcipher_walk walk;\n\n\tint err;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\terr = blkcipher_walk_virt_block(desc, &walk, DES3_EDE_BLOCK_SIZE);\n\n\n\n\twhile ((nbytes = walk.nbytes) >= DES3_EDE_BLOCK_SIZE) {\n\n\t\tnbytes = __ctr_crypt(desc, &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, nbytes);\n\n\t}\n\n\n\n\tif (walk.nbytes) {\n\n\t\tctr_crypt_final(crypto_blkcipher_ctx(desc->tfm), &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, 0);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic int des3_ede_x86_setkey(struct crypto_tfm *tfm, const u8 *key,\n\n\t\t\t       unsigned int keylen)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_tfm_ctx(tfm);\n\n\tu32 i, j, tmp;\n\n\tint err;\n\n\n\n\t/* Generate encryption context using generic implementation. */\n\n\terr = __des3_ede_setkey(ctx->enc_expkey, &tfm->crt_flags, key, keylen);\n\n\tif (err < 0)\n\n\t\treturn err;\n\n\n\n\t/* Fix encryption context for this implementation and form decryption\n\n\t * context. */\n\n\tj = DES3_EDE_EXPKEY_WORDS - 2;\n\n\tfor (i = 0; i < DES3_EDE_EXPKEY_WORDS; i += 2, j -= 2) {\n\n\t\ttmp = ror32(ctx->enc_expkey[i + 1], 4);\n\n\t\tctx->enc_expkey[i + 1] = tmp;\n\n\n\n\t\tctx->dec_expkey[j + 0] = ctx->enc_expkey[i + 0];\n\n\t\tctx->dec_expkey[j + 1] = tmp;\n\n\t}\n\n\n\n\treturn 0;\n\n}\n\n\n\nstatic struct crypto_alg des3_ede_algs[4] = { {\n\n\t.cra_name\t\t= \"des3_ede\",\n\n\t.cra_driver_name\t= \"des3_ede-asm\",\n\n\t.cra_priority\t\t= 200,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_CIPHER,\n\n\t.cra_blocksize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.cipher = {\n\n\t\t\t.cia_min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.cia_max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.cia_setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.cia_encrypt\t\t= des3_ede_x86_encrypt,\n\n\t\t\t.cia_decrypt\t\t= des3_ede_x86_decrypt,\n\n\t\t}\n\n\t}\n\n}, {\n\n\t.cra_name\t\t= \"ecb(des3_ede)\",\n\n\t.cra_driver_name\t= \"ecb-des3_ede-asm\",\n\n\t.cra_priority\t\t= 300,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_BLKCIPHER,\n\n\t.cra_blocksize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_type\t\t= &crypto_blkcipher_type,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.blkcipher = {\n\n\t\t\t.min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.encrypt\t= ecb_encrypt,\n\n\t\t\t.decrypt\t= ecb_decrypt,\n\n\t\t},\n\n\t},\n\n}, {\n\n\t.cra_name\t\t= \"cbc(des3_ede)\",\n\n\t.cra_driver_name\t= \"cbc-des3_ede-asm\",\n\n\t.cra_priority\t\t= 300,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_BLKCIPHER,\n\n\t.cra_blocksize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_type\t\t= &crypto_blkcipher_type,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.blkcipher = {\n\n\t\t\t.min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.ivsize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t\t\t.setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.encrypt\t= cbc_encrypt,\n\n\t\t\t.decrypt\t= cbc_decrypt,\n\n\t\t},\n\n\t},\n\n}, {\n\n\t.cra_name\t\t= \"ctr(des3_ede)\",\n\n\t.cra_driver_name\t= \"ctr-des3_ede-asm\",\n\n\t.cra_priority\t\t= 300,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_BLKCIPHER,\n\n\t.cra_blocksize\t\t= 1,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_type\t\t= &crypto_blkcipher_type,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.blkcipher = {\n\n\t\t\t.min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.ivsize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t\t\t.setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.encrypt\t= ctr_crypt,\n\n\t\t\t.decrypt\t= ctr_crypt,\n\n\t\t},\n\n\t},\n\n} };\n\n\n\nstatic bool is_blacklisted_cpu(void)\n\n{\n\n\tif (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)\n\n\t\treturn false;\n\n\n\n\tif (boot_cpu_data.x86 == 0x0f) {\n\n\t\t/*\n\n\t\t * On Pentium 4, des3_ede-x86_64 is slower than generic C\n\n\t\t * implementation because use of 64bit rotates (which are really\n\n\t\t * slow on P4). Therefore blacklist P4s.\n\n\t\t */\n\n\t\treturn true;\n\n\t}\n\n\n\n\treturn false;\n\n}\n\n\n\nstatic int force;\n\nmodule_param(force, int, 0);\n\nMODULE_PARM_DESC(force, \"Force module load, ignore CPU blacklist\");\n\n\n\nstatic int __init des3_ede_x86_init(void)\n\n{\n\n\tif (!force && is_blacklisted_cpu()) {\n\n\t\tpr_info(\"des3_ede-x86_64: performance on this CPU would be suboptimal: disabling des3_ede-x86_64.\\n\");\n\n\t\treturn -ENODEV;\n\n\t}\n\n\n\n\treturn crypto_register_algs(des3_ede_algs, ARRAY_SIZE(des3_ede_algs));\n\n}\n\n\n\nstatic void __exit des3_ede_x86_fini(void)\n\n{\n\n\tcrypto_unregister_algs(des3_ede_algs, ARRAY_SIZE(des3_ede_algs));\n\n}\n\n\n\nmodule_init(des3_ede_x86_init);\n\nmodule_exit(des3_ede_x86_fini);\n\n\n\nMODULE_LICENSE(\"GPL\");\n\nMODULE_DESCRIPTION(\"Triple DES EDE Cipher Algorithm, asm optimized\");\n\nMODULE_ALIAS(\"des3_ede\");\n\nMODULE_ALIAS(\"des3_ede-asm\");\n\nMODULE_ALIAS(\"des\");\n\nMODULE_ALIAS(\"des-asm\");\n\nMODULE_AUTHOR(\"Jussi Kivilinna <jussi.kivilinna@iki.fi>\");\n\n```"
+          }
+        ],
+        "role": "user"
+      },
+      "responses": [
+        {
+          "response": {
+            "parts": [
+              {
+                "text": "### Security Debate Audit Result\n\n**Predicate Under Test:**\n> *\"The code is vulnerable to key‑material leakage because the expanded key buffers (enc_expkey and dec_expkey) are never explicitly zeroed when a crypto_tfm is freed or the module is unloaded\"*\n\n---\n\n### Audit Summary & Verdict\n\n- **Run ID:** `des3-key-leakage-audit`\n- **Adjudication Decision:** `accepted` (Pro debater position upheld)\n- **Judge Rationale Excerpt:** \n  > *\"The pro debater presents concrete evidence of a missing zeroing step and a clear predicate fulfillment, while the con debater's defense depends on optional kernel settings, making the pro position stronger.\"*\n\n---\n\n### Technical Security Finding\n\n1. **Missing Cleanup Handler (`.cra_exit` or `memzero_explicit`):**\n   - The context structure `struct des3_ede_x86_ctx` defines `enc_expkey` and `dec_expkey` buffers holding expanded DES key material (`u32 enc_expkey[DES3_EDE_EXPKEY_WORDS]`, `u32 dec_expkey[DES3_EDE_EXPKEY_WORDS]`).\n   - The cipher algorithms registered in `des3_ede_algs` do not specify a `.cra_exit` cleanup function to wipe `crypto_tfm_ctx(tfm)` upon release.\n   - When a `crypto_tfm` object is freed or the module is unloaded, sensitive expanded subkeys remain in freed heap memory, exposing key material to potential residual memory extraction attacks.\n\n---\n\n### Deterministic BARRED Artifact & B-Gate Metrics\n\n| Metric | Result / Rate | Status |\n| :--- | :--- | :--- |\n| **B-Gate Overall Status** | `PASS` | Passed |\n| **B0 Structural Completeness Rate** | `1.0` (100%) | Pass |\n| **B1 Unsupported Predicate Rate** | `0.0` (0%) | Pass |\n| **B1 Inconclusive Predicate Rate** | `0.0` (0%) | Pass |\n| **B2 Anchor Match Rate** | `1.0` (100%) | Pass |\n| **Verifier Pass Rate** | `1.0` (100%) | Pass |\n| **Verifier Parse-OK Rate** | `1.0` (100%) | Pass |\n| **Accepted Logic Error Rate** | `0.0` (0%) | Pass |\n| **Accepted Attempts Count** | `2` | Pass |\n\n#### Model Routing Metadata\n- **Generator / Debater Model:** `ollama/gemma4:31b-cloud`\n- **Judge / Verifier Model:** `ollama/gpt-oss:120b-cloud`\n- **Cassette File:** `artifacts/cassettes/des3-key-leakage-audit.json` (13 local replay entries)\n- **Attempts File:** `artifacts/attempts/des3-key-leakage-audit.jsonl`\n- **Run Record:** `artifacts/runs/des3-key-leakage-audit/42.json`"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "eval_case_id": "cve_seed_05",
+      "agent_data": {
+        "agents": {
+          "root_agent": {
+            "agent_id": "root_agent",
+            "agent_type": "LlmAgent",
+            "description": "",
+            "instruction": "You are BARRED-Fleet, an adapter over the BARRED security-evidence harness. Use deterministic tools for artifact facts. Do not invent missing metrics, and do not describe cassette replay as provider-side cache telemetry.",
+            "tools": [
+              {
+                "function_declarations": [
+                  {
+                    "description": "Summarize BARRED run artifacts without calling a model.\n\nArgs:\n    attempts_path: Path to an attempts JSONL artifact, relative to the BARRED repo root.\n    checkpoint_path: Path to a checkpoint JSON artifact, relative to the BARRED repo root.\n    record_path: Path to a run-record JSON artifact, relative to the BARRED repo root.\n    cassette_path: Path to a cassette JSON artifact, relative to the BARRED repo root.\n\nReturns:\n    A deterministic summary of artifact existence, counts, decisions, and verifier metadata.",
+                    "name": "summarize_artifacts",
+                    "parameters_json_schema": {
+                      "properties": {
+                        "attempts_path": {
+                          "default": "",
+                          "title": "Attempts Path",
+                          "type": "string"
+                        },
+                        "checkpoint_path": {
+                          "default": "",
+                          "title": "Checkpoint Path",
+                          "type": "string"
+                        },
+                        "record_path": {
+                          "default": "",
+                          "title": "Record Path",
+                          "type": "string"
+                        },
+                        "cassette_path": {
+                          "default": "",
+                          "title": "Cassette Path",
+                          "type": "string"
+                        }
+                      },
+                      "title": "summarize_artifactsParams",
+                      "type": "object"
+                    },
+                    "response_json_schema": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  }
+                ]
+              },
+              {
+                "function_declarations": [
+                  {
+                    "description": "Run BARRED offline B-gate metrics over corpus and attempt artifacts.\n\nArgs:\n    input_path: Path to the training corpus JSONL artifact, relative to the BARRED repo root.\n    attempts_path: Optional path to attempts JSONL, relative to the BARRED repo root.\n    max_unsupported_rate: Maximum allowed unsupported predicate rate.\n    max_inconclusive_rate: Maximum allowed inconclusive predicate rate.\n    min_anchor_match_rate: Minimum required anchor match rate.\n    min_verifier_pass_rate: Minimum required verifier pass rate when attempts are supplied.\n    min_verifier_parse_ok_rate: Minimum required verifier parse-ok rate when attempts are supplied.\n    max_accepted_logic_error_rate: Maximum allowed accepted logic-error rate.\n\nReturns:\n    B-gate pass/fail status, failed checks, selected metrics, and full metrics.",
+                    "name": "run_b_gate",
+                    "parameters_json_schema": {
+                      "properties": {
+                        "input_path": {
+                          "title": "Input Path",
+                          "type": "string"
+                        },
+                        "attempts_path": {
+                          "default": "",
+                          "title": "Attempts Path",
+                          "type": "string"
+                        },
+                        "max_unsupported_rate": {
+                          "default": 0.05,
+                          "title": "Max Unsupported Rate",
+                          "type": "number"
+                        },
+                        "max_inconclusive_rate": {
+                          "default": 0.2,
+                          "title": "Max Inconclusive Rate",
+                          "type": "number"
+                        },
+                        "min_anchor_match_rate": {
+                          "default": 0.8,
+                          "title": "Min Anchor Match Rate",
+                          "type": "number"
+                        },
+                        "min_verifier_pass_rate": {
+                          "default": 0.0,
+                          "title": "Min Verifier Pass Rate",
+                          "type": "number"
+                        },
+                        "min_verifier_parse_ok_rate": {
+                          "default": 0.0,
+                          "title": "Min Verifier Parse Ok Rate",
+                          "type": "number"
+                        },
+                        "max_accepted_logic_error_rate": {
+                          "default": 0.0,
+                          "title": "Max Accepted Logic Error Rate",
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "input_path"
+                      ],
+                      "title": "run_b_gateParams",
+                      "type": "object"
+                    },
+                    "response_json_schema": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  }
+                ]
+              },
+              {
+                "function_declarations": [
+                  {
+                    "description": "Build a deterministic BARRED-Fleet observability report.\n\nArgs:\n    run_id: Human-readable run identifier to attach to the report.\n    input_path: Path to the accepted corpus JSONL artifact, relative to the BARRED repo root.\n    attempts_path: Optional path to attempts JSONL, relative to the BARRED repo root.\n    checkpoint_path: Optional path to checkpoint JSON, relative to the BARRED repo root.\n    record_path: Optional path to run-record JSON, relative to the BARRED repo root.\n    cassette_path: Optional path to cassette JSON, relative to the BARRED repo root.\n    llm_eval_result_path: Optional path to an LLM-backed eval result JSON.\n    deterministic_eval_result_path: Optional path to a deterministic eval result JSON.\n    min_verifier_parse_ok_rate: Minimum verifier parse-ok rate expected by this report.\n\nReturns:\n    A local, deterministic report containing artifact status, B-gate status,\n    model routing, verifier metrics, eval result summaries, and report checks.",
+                    "name": "report_barred_run",
+                    "parameters_json_schema": {
+                      "properties": {
+                        "run_id": {
+                          "title": "Run Id",
+                          "type": "string"
+                        },
+                        "input_path": {
+                          "default": "",
+                          "title": "Input Path",
+                          "type": "string"
+                        },
+                        "attempts_path": {
+                          "default": "",
+                          "title": "Attempts Path",
+                          "type": "string"
+                        },
+                        "checkpoint_path": {
+                          "default": "",
+                          "title": "Checkpoint Path",
+                          "type": "string"
+                        },
+                        "record_path": {
+                          "default": "",
+                          "title": "Record Path",
+                          "type": "string"
+                        },
+                        "cassette_path": {
+                          "default": "",
+                          "title": "Cassette Path",
+                          "type": "string"
+                        },
+                        "llm_eval_result_path": {
+                          "default": "",
+                          "title": "Llm Eval Result Path",
+                          "type": "string"
+                        },
+                        "deterministic_eval_result_path": {
+                          "default": "",
+                          "title": "Deterministic Eval Result Path",
+                          "type": "string"
+                        },
+                        "min_verifier_parse_ok_rate": {
+                          "default": 0.0,
+                          "title": "Min Verifier Parse Ok Rate",
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "run_id"
+                      ],
+                      "title": "report_barred_runParams",
+                      "type": "object"
+                    },
+                    "response_json_schema": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  }
+                ]
+              },
+              {
+                "function_declarations": [
+                  {
+                    "description": "Run one BARRED debate case through the existing local A2A judge.\n\nThe BARRED debate stack must already be running, for example with\n`uv run agentbeats-run scenarios/debate/barred_test.toml --serve-only`.\n\nArgs:\n    code: Candidate code snippet or patch to debate.\n    predicate: Specific vulnerability claim to evaluate.\n    run_id: Stable run identifier for artifacts.\n    seed: Deterministic seed passed through to BARRED.\n    mode: BARRED cassette mode, either record or replay.\n    judge_url: Existing BARRED judge A2A endpoint.\n    target_verdict: Target verdict expected by BARRED generation.\n    target_dimension: Evaluation dimension metadata.\n    num_rounds: Number of pro/con debate rounds.\n    max_refinements: Maximum BARRED refinement rounds.\n    output_file: Existing BARRED accepted-corpus output path.\n    attempts_path: Existing BARRED attempts JSONL path.\n    checkpoint_path: Existing BARRED checkpoint path.\n    record_path: Existing BARRED run-record path.\n    cassette_path: Existing BARRED cassette path.\n    clock_now: Optional fixed timestamp for deterministic records.\n    resume: Whether the existing judge should resume from checkpoint.\n\nReturns:\n    Status, response excerpt, context id, artifact paths, and payload controls.",
+                    "name": "run_debate_case",
+                    "parameters_json_schema": {
+                      "properties": {
+                        "code": {
+                          "title": "Code",
+                          "type": "string"
+                        },
+                        "predicate": {
+                          "title": "Predicate",
+                          "type": "string"
+                        },
+                        "run_id": {
+                          "default": "barred-fleet-adhoc",
+                          "title": "Run Id",
+                          "type": "string"
+                        },
+                        "seed": {
+                          "default": 42,
+                          "title": "Seed",
+                          "type": "integer"
+                        },
+                        "mode": {
+                          "default": "record",
+                          "title": "Mode",
+                          "type": "string"
+                        },
+                        "judge_url": {
+                          "default": "http://127.0.0.1:9009",
+                          "title": "Judge Url",
+                          "type": "string"
+                        },
+                        "target_verdict": {
+                          "default": "True",
+                          "title": "Target Verdict",
+                          "type": "string"
+                        },
+                        "target_dimension": {
+                          "default": "Security Invariants",
+                          "title": "Target Dimension",
+                          "type": "string"
+                        },
+                        "num_rounds": {
+                          "default": 2,
+                          "title": "Num Rounds",
+                          "type": "integer"
+                        },
+                        "max_refinements": {
+                          "default": 1,
+                          "title": "Max Refinements",
+                          "type": "integer"
+                        },
+                        "output_file": {
+                          "default": "training_corpus.jsonl",
+                          "title": "Output File",
+                          "type": "string"
+                        },
+                        "attempts_path": {
+                          "default": "",
+                          "title": "Attempts Path",
+                          "type": "string"
+                        },
+                        "checkpoint_path": {
+                          "default": "",
+                          "title": "Checkpoint Path",
+                          "type": "string"
+                        },
+                        "record_path": {
+                          "default": "",
+                          "title": "Record Path",
+                          "type": "string"
+                        },
+                        "cassette_path": {
+                          "default": "",
+                          "title": "Cassette Path",
+                          "type": "string"
+                        },
+                        "clock_now": {
+                          "default": "",
+                          "title": "Clock Now",
+                          "type": "string"
+                        },
+                        "resume": {
+                          "default": false,
+                          "title": "Resume",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "predicate"
+                      ],
+                      "title": "run_debate_caseParams",
+                      "type": "object"
+                    },
+                    "response_json_schema": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  }
+                ]
+              }
+            ],
+            "sub_agents": []
+          }
+        },
+        "turns": [
+          {
+            "turn_index": 0,
+            "turn_id": "turn_0",
+            "events": [
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "call_1195356",
+                        "args": {
+                          "predicate": "The code is vulnerable to key‑material leakage because the expanded key buffers (enc_expkey and dec_expkey) are never explicitly zeroed when a crypto_tfm is freed or the module is unloaded",
+                          "run_id": "des3-key-leakage-audit",
+                          "code": "/*\n\n * Glue Code for assembler optimized version of 3DES\n\n *\n\n * Copyright © 2014 Jussi Kivilinna <jussi.kivilinna@mbnet.fi>\n\n *\n\n * CBC & ECB parts based on code (crypto/cbc.c,ecb.c) by:\n\n *   Copyright (c) 2006 Herbert Xu <herbert@gondor.apana.org.au>\n\n * CTR part based on code (crypto/ctr.c) by:\n\n *   (C) Copyright IBM Corp. 2007 - Joy Latten <latten@us.ibm.com>\n\n *\n\n * This program is free software; you can redistribute it and/or modify\n\n * it under the terms of the GNU General Public License as published by\n\n * the Free Software Foundation; either version 2 of the License, or\n\n * (at your option) any later version.\n\n *\n\n * This program is distributed in the hope that it will be useful,\n\n * but WITHOUT ANY WARRANTY; without even the implied warranty of\n\n * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n\n * GNU General Public License for more details.\n\n *\n\n */\n\n\n\n#include <asm/processor.h>\n\n#include <crypto/des.h>\n\n#include <linux/crypto.h>\n\n#include <linux/init.h>\n\n#include <linux/module.h>\n\n#include <linux/types.h>\n\n#include <crypto/algapi.h>\n\n\n\nstruct des3_ede_x86_ctx {\n\n\tu32 enc_expkey[DES3_EDE_EXPKEY_WORDS];\n\n\tu32 dec_expkey[DES3_EDE_EXPKEY_WORDS];\n\n};\n\n\n\n/* regular block cipher functions */\n\nasmlinkage void des3_ede_x86_64_crypt_blk(const u32 *expkey, u8 *dst,\n\n\t\t\t\t\t  const u8 *src);\n\n\n\n/* 3-way parallel cipher functions */\n\nasmlinkage void des3_ede_x86_64_crypt_blk_3way(const u32 *expkey, u8 *dst,\n\n\t\t\t\t\t       const u8 *src);\n\n\n\nstatic inline void des3_ede_enc_blk(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t    const u8 *src)\n\n{\n\n\tu32 *enc_ctx = ctx->enc_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk(enc_ctx, dst, src);\n\n}\n\n\n\nstatic inline void des3_ede_dec_blk(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t    const u8 *src)\n\n{\n\n\tu32 *dec_ctx = ctx->dec_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk(dec_ctx, dst, src);\n\n}\n\n\n\nstatic inline void des3_ede_enc_blk_3way(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t\t const u8 *src)\n\n{\n\n\tu32 *enc_ctx = ctx->enc_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk_3way(enc_ctx, dst, src);\n\n}\n\n\n\nstatic inline void des3_ede_dec_blk_3way(struct des3_ede_x86_ctx *ctx, u8 *dst,\n\n\t\t\t\t\t const u8 *src)\n\n{\n\n\tu32 *dec_ctx = ctx->dec_expkey;\n\n\n\n\tdes3_ede_x86_64_crypt_blk_3way(dec_ctx, dst, src);\n\n}\n\n\n\nstatic void des3_ede_x86_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)\n\n{\n\n\tdes3_ede_enc_blk(crypto_tfm_ctx(tfm), dst, src);\n\n}\n\n\n\nstatic void des3_ede_x86_decrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)\n\n{\n\n\tdes3_ede_dec_blk(crypto_tfm_ctx(tfm), dst, src);\n\n}\n\n\n\nstatic int ecb_crypt(struct blkcipher_desc *desc, struct blkcipher_walk *walk,\n\n\t\t     const u32 *expkey)\n\n{\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes;\n\n\tint err;\n\n\n\n\terr = blkcipher_walk_virt(desc, walk);\n\n\n\n\twhile ((nbytes = walk->nbytes)) {\n\n\t\tu8 *wsrc = walk->src.virt.addr;\n\n\t\tu8 *wdst = walk->dst.virt.addr;\n\n\n\n\t\t/* Process four block batch */\n\n\t\tif (nbytes >= bsize * 3) {\n\n\t\t\tdo {\n\n\t\t\t\tdes3_ede_x86_64_crypt_blk_3way(expkey, wdst,\n\n\t\t\t\t\t\t\t       wsrc);\n\n\n\n\t\t\t\twsrc += bsize * 3;\n\n\t\t\t\twdst += bsize * 3;\n\n\t\t\t\tnbytes -= bsize * 3;\n\n\t\t\t} while (nbytes >= bsize * 3);\n\n\n\n\t\t\tif (nbytes < bsize)\n\n\t\t\t\tgoto done;\n\n\t\t}\n\n\n\n\t\t/* Handle leftovers */\n\n\t\tdo {\n\n\t\t\tdes3_ede_x86_64_crypt_blk(expkey, wdst, wsrc);\n\n\n\n\t\t\twsrc += bsize;\n\n\t\t\twdst += bsize;\n\n\t\t\tnbytes -= bsize;\n\n\t\t} while (nbytes >= bsize);\n\n\n\ndone:\n\n\t\terr = blkcipher_walk_done(desc, walk, nbytes);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic int ecb_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tstruct blkcipher_walk walk;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\treturn ecb_crypt(desc, &walk, ctx->enc_expkey);\n\n}\n\n\n\nstatic int ecb_decrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tstruct blkcipher_walk walk;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\treturn ecb_crypt(desc, &walk, ctx->dec_expkey);\n\n}\n\n\n\nstatic unsigned int __cbc_encrypt(struct blkcipher_desc *desc,\n\n\t\t\t\t  struct blkcipher_walk *walk)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\tu64 *src = (u64 *)walk->src.virt.addr;\n\n\tu64 *dst = (u64 *)walk->dst.virt.addr;\n\n\tu64 *iv = (u64 *)walk->iv;\n\n\n\n\tdo {\n\n\t\t*dst = *src ^ *iv;\n\n\t\tdes3_ede_enc_blk(ctx, (u8 *)dst, (u8 *)dst);\n\n\t\tiv = dst;\n\n\n\n\t\tsrc += 1;\n\n\t\tdst += 1;\n\n\t\tnbytes -= bsize;\n\n\t} while (nbytes >= bsize);\n\n\n\n\t*(u64 *)walk->iv = *iv;\n\n\treturn nbytes;\n\n}\n\n\n\nstatic int cbc_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct blkcipher_walk walk;\n\n\tint err;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\terr = blkcipher_walk_virt(desc, &walk);\n\n\n\n\twhile ((nbytes = walk.nbytes)) {\n\n\t\tnbytes = __cbc_encrypt(desc, &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, nbytes);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic unsigned int __cbc_decrypt(struct blkcipher_desc *desc,\n\n\t\t\t\t  struct blkcipher_walk *walk)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\tu64 *src = (u64 *)walk->src.virt.addr;\n\n\tu64 *dst = (u64 *)walk->dst.virt.addr;\n\n\tu64 ivs[3 - 1];\n\n\tu64 last_iv;\n\n\n\n\t/* Start of the last block. */\n\n\tsrc += nbytes / bsize - 1;\n\n\tdst += nbytes / bsize - 1;\n\n\n\n\tlast_iv = *src;\n\n\n\n\t/* Process four block batch */\n\n\tif (nbytes >= bsize * 3) {\n\n\t\tdo {\n\n\t\t\tnbytes -= bsize * 3 - bsize;\n\n\t\t\tsrc -= 3 - 1;\n\n\t\t\tdst -= 3 - 1;\n\n\n\n\t\t\tivs[0] = src[0];\n\n\t\t\tivs[1] = src[1];\n\n\n\n\t\t\tdes3_ede_dec_blk_3way(ctx, (u8 *)dst, (u8 *)src);\n\n\n\n\t\t\tdst[1] ^= ivs[0];\n\n\t\t\tdst[2] ^= ivs[1];\n\n\n\n\t\t\tnbytes -= bsize;\n\n\t\t\tif (nbytes < bsize)\n\n\t\t\t\tgoto done;\n\n\n\n\t\t\t*dst ^= *(src - 1);\n\n\t\t\tsrc -= 1;\n\n\t\t\tdst -= 1;\n\n\t\t} while (nbytes >= bsize * 3);\n\n\t}\n\n\n\n\t/* Handle leftovers */\n\n\tfor (;;) {\n\n\t\tdes3_ede_dec_blk(ctx, (u8 *)dst, (u8 *)src);\n\n\n\n\t\tnbytes -= bsize;\n\n\t\tif (nbytes < bsize)\n\n\t\t\tbreak;\n\n\n\n\t\t*dst ^= *(src - 1);\n\n\t\tsrc -= 1;\n\n\t\tdst -= 1;\n\n\t}\n\n\n\ndone:\n\n\t*dst ^= *(u64 *)walk->iv;\n\n\t*(u64 *)walk->iv = last_iv;\n\n\n\n\treturn nbytes;\n\n}\n\n\n\nstatic int cbc_decrypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t       struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct blkcipher_walk walk;\n\n\tint err;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\terr = blkcipher_walk_virt(desc, &walk);\n\n\n\n\twhile ((nbytes = walk.nbytes)) {\n\n\t\tnbytes = __cbc_decrypt(desc, &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, nbytes);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic void ctr_crypt_final(struct des3_ede_x86_ctx *ctx,\n\n\t\t\t    struct blkcipher_walk *walk)\n\n{\n\n\tu8 *ctrblk = walk->iv;\n\n\tu8 keystream[DES3_EDE_BLOCK_SIZE];\n\n\tu8 *src = walk->src.virt.addr;\n\n\tu8 *dst = walk->dst.virt.addr;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\n\n\tdes3_ede_enc_blk(ctx, keystream, ctrblk);\n\n\tcrypto_xor(keystream, src, nbytes);\n\n\tmemcpy(dst, keystream, nbytes);\n\n\n\n\tcrypto_inc(ctrblk, DES3_EDE_BLOCK_SIZE);\n\n}\n\n\n\nstatic unsigned int __ctr_crypt(struct blkcipher_desc *desc,\n\n\t\t\t\tstruct blkcipher_walk *walk)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);\n\n\tunsigned int bsize = DES3_EDE_BLOCK_SIZE;\n\n\tunsigned int nbytes = walk->nbytes;\n\n\t__be64 *src = (__be64 *)walk->src.virt.addr;\n\n\t__be64 *dst = (__be64 *)walk->dst.virt.addr;\n\n\tu64 ctrblk = be64_to_cpu(*(__be64 *)walk->iv);\n\n\t__be64 ctrblocks[3];\n\n\n\n\t/* Process four block batch */\n\n\tif (nbytes >= bsize * 3) {\n\n\t\tdo {\n\n\t\t\t/* create ctrblks for parallel encrypt */\n\n\t\t\tctrblocks[0] = cpu_to_be64(ctrblk++);\n\n\t\t\tctrblocks[1] = cpu_to_be64(ctrblk++);\n\n\t\t\tctrblocks[2] = cpu_to_be64(ctrblk++);\n\n\n\n\t\t\tdes3_ede_enc_blk_3way(ctx, (u8 *)ctrblocks,\n\n\t\t\t\t\t      (u8 *)ctrblocks);\n\n\n\n\t\t\tdst[0] = src[0] ^ ctrblocks[0];\n\n\t\t\tdst[1] = src[1] ^ ctrblocks[1];\n\n\t\t\tdst[2] = src[2] ^ ctrblocks[2];\n\n\n\n\t\t\tsrc += 3;\n\n\t\t\tdst += 3;\n\n\t\t} while ((nbytes -= bsize * 3) >= bsize * 3);\n\n\n\n\t\tif (nbytes < bsize)\n\n\t\t\tgoto done;\n\n\t}\n\n\n\n\t/* Handle leftovers */\n\n\tdo {\n\n\t\tctrblocks[0] = cpu_to_be64(ctrblk++);\n\n\n\n\t\tdes3_ede_enc_blk(ctx, (u8 *)ctrblocks, (u8 *)ctrblocks);\n\n\n\n\t\tdst[0] = src[0] ^ ctrblocks[0];\n\n\n\n\t\tsrc += 1;\n\n\t\tdst += 1;\n\n\t} while ((nbytes -= bsize) >= bsize);\n\n\n\ndone:\n\n\t*(__be64 *)walk->iv = cpu_to_be64(ctrblk);\n\n\treturn nbytes;\n\n}\n\n\n\nstatic int ctr_crypt(struct blkcipher_desc *desc, struct scatterlist *dst,\n\n\t\t     struct scatterlist *src, unsigned int nbytes)\n\n{\n\n\tstruct blkcipher_walk walk;\n\n\tint err;\n\n\n\n\tblkcipher_walk_init(&walk, dst, src, nbytes);\n\n\terr = blkcipher_walk_virt_block(desc, &walk, DES3_EDE_BLOCK_SIZE);\n\n\n\n\twhile ((nbytes = walk.nbytes) >= DES3_EDE_BLOCK_SIZE) {\n\n\t\tnbytes = __ctr_crypt(desc, &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, nbytes);\n\n\t}\n\n\n\n\tif (walk.nbytes) {\n\n\t\tctr_crypt_final(crypto_blkcipher_ctx(desc->tfm), &walk);\n\n\t\terr = blkcipher_walk_done(desc, &walk, 0);\n\n\t}\n\n\n\n\treturn err;\n\n}\n\n\n\nstatic int des3_ede_x86_setkey(struct crypto_tfm *tfm, const u8 *key,\n\n\t\t\t       unsigned int keylen)\n\n{\n\n\tstruct des3_ede_x86_ctx *ctx = crypto_tfm_ctx(tfm);\n\n\tu32 i, j, tmp;\n\n\tint err;\n\n\n\n\t/* Generate encryption context using generic implementation. */\n\n\terr = __des3_ede_setkey(ctx->enc_expkey, &tfm->crt_flags, key, keylen);\n\n\tif (err < 0)\n\n\t\treturn err;\n\n\n\n\t/* Fix encryption context for this implementation and form decryption\n\n\t * context. */\n\n\tj = DES3_EDE_EXPKEY_WORDS - 2;\n\n\tfor (i = 0; i < DES3_EDE_EXPKEY_WORDS; i += 2, j -= 2) {\n\n\t\ttmp = ror32(ctx->enc_expkey[i + 1], 4);\n\n\t\tctx->enc_expkey[i + 1] = tmp;\n\n\n\n\t\tctx->dec_expkey[j + 0] = ctx->enc_expkey[i + 0];\n\n\t\tctx->dec_expkey[j + 1] = tmp;\n\n\t}\n\n\n\n\treturn 0;\n\n}\n\n\n\nstatic struct crypto_alg des3_ede_algs[4] = { {\n\n\t.cra_name\t\t= \"des3_ede\",\n\n\t.cra_driver_name\t= \"des3_ede-asm\",\n\n\t.cra_priority\t\t= 200,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_CIPHER,\n\n\t.cra_blocksize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.cipher = {\n\n\t\t\t.cia_min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.cia_max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.cia_setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.cia_encrypt\t\t= des3_ede_x86_encrypt,\n\n\t\t\t.cia_decrypt\t\t= des3_ede_x86_decrypt,\n\n\t\t}\n\n\t}\n\n}, {\n\n\t.cra_name\t\t= \"ecb(des3_ede)\",\n\n\t.cra_driver_name\t= \"ecb-des3_ede-asm\",\n\n\t.cra_priority\t\t= 300,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_BLKCIPHER,\n\n\t.cra_blocksize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_type\t\t= &crypto_blkcipher_type,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.blkcipher = {\n\n\t\t\t.min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.encrypt\t= ecb_encrypt,\n\n\t\t\t.decrypt\t= ecb_decrypt,\n\n\t\t},\n\n\t},\n\n}, {\n\n\t.cra_name\t\t= \"cbc(des3_ede)\",\n\n\t.cra_driver_name\t= \"cbc-des3_ede-asm\",\n\n\t.cra_priority\t\t= 300,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_BLKCIPHER,\n\n\t.cra_blocksize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_type\t\t= &crypto_blkcipher_type,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.blkcipher = {\n\n\t\t\t.min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.ivsize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t\t\t.setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.encrypt\t= cbc_encrypt,\n\n\t\t\t.decrypt\t= cbc_decrypt,\n\n\t\t},\n\n\t},\n\n}, {\n\n\t.cra_name\t\t= \"ctr(des3_ede)\",\n\n\t.cra_driver_name\t= \"ctr-des3_ede-asm\",\n\n\t.cra_priority\t\t= 300,\n\n\t.cra_flags\t\t= CRYPTO_ALG_TYPE_BLKCIPHER,\n\n\t.cra_blocksize\t\t= 1,\n\n\t.cra_ctxsize\t\t= sizeof(struct des3_ede_x86_ctx),\n\n\t.cra_alignmask\t\t= 0,\n\n\t.cra_type\t\t= &crypto_blkcipher_type,\n\n\t.cra_module\t\t= THIS_MODULE,\n\n\t.cra_u = {\n\n\t\t.blkcipher = {\n\n\t\t\t.min_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.max_keysize\t= DES3_EDE_KEY_SIZE,\n\n\t\t\t.ivsize\t\t= DES3_EDE_BLOCK_SIZE,\n\n\t\t\t.setkey\t\t= des3_ede_x86_setkey,\n\n\t\t\t.encrypt\t= ctr_crypt,\n\n\t\t\t.decrypt\t= ctr_crypt,\n\n\t\t},\n\n\t},\n\n} };\n\n\n\nstatic bool is_blacklisted_cpu(void)\n\n{\n\n\tif (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)\n\n\t\treturn false;\n\n\n\n\tif (boot_cpu_data.x86 == 0x0f) {\n\n\t\t/*\n\n\t\t * On Pentium 4, des3_ede-x86_64 is slower than generic C\n\n\t\t * implementation because use of 64bit rotates (which are really\n\n\t\t * slow on P4). Therefore blacklist P4s.\n\n\t\t */\n\n\t\treturn true;\n\n\t}\n\n\n\n\treturn false;\n\n}\n\n\n\nstatic int force;\n\nmodule_param(force, int, 0);\n\nMODULE_PARM_DESC(force, \"Force module load, ignore CPU blacklist\");\n\n\n\nstatic int __init des3_ede_x86_init(void)\n\n{\n\n\tif (!force && is_blacklisted_cpu()) {\n\n\t\tpr_info(\"des3_ede-x86_64: performance on this CPU would be suboptimal: disabling des3_ede-x86_64.\\n\");\n\n\t\treturn -ENODEV;\n\n\t}\n\n\n\n\treturn crypto_register_algs(des3_ede_algs, ARRAY_SIZE(des3_ede_algs));\n\n}\n\n\n\nstatic void __exit des3_ede_x86_fini(void)\n\n{\n\n\tcrypto_unregister_algs(des3_ede_algs, ARRAY_SIZE(des3_ede_algs));\n\n}\n\n\n\nmodule_init(des3_ede_x86_init);\n\nmodule_exit(des3_ede_x86_fini);\n\n\n\nMODULE_LICENSE(\"GPL\");\n\nMODULE_DESCRIPTION(\"Triple DES EDE Cipher Algorithm, asm optimized\");\n\nMODULE_ALIAS(\"des3_ede\");\n\nMODULE_ALIAS(\"des3_ede-asm\");\n\nMODULE_ALIAS(\"des\");\n\nMODULE_ALIAS(\"des-asm\");\n\nMODULE_AUTHOR(\"Jussi Kivilinna <jussi.kivilinna@iki.fi>\");"
+                        },
+                        "name": "run_debate_case"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                },
+                "event_time": "2026-08-25T23:30:25.850803Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "call_1195356",
+                        "name": "run_debate_case",
+                        "response": {
+                          "status": "completed",
+                          "context_id": "5fdb7265-277e-44f0-8153-10cd75898b09",
+                          "response_excerpt": "Sample Accepted and saved to training_corpus.jsonl\nThe pro debater presents concrete evidence of a missing zeroing step and a clear predicate fulfillment, while the con debater's defense depends on optional kernel settings, making the pro position stronger.\nstruct_value {\n  fields {\n    key: \"reflector_prompt\"\n    value {\n      string_value: \"\"\n    }\n  }\n  fields {\n    key: \"decision\"\n    value {\n      string_value: \"accepted\"\n    }\n  }\n  fields {\n    key: \"attempt_index\"\n    value {\n      number_value: 1\n    }\n  }\n  fields {\n    key: \"active_mutation_id\"\n    value {\n      string_value: \"baseline_v0\"\n    }\n  }\n}\n",
+                          "judge_url": "http://127.0.0.1:9009",
+                          "artifact_paths": {
+                            "attempts_path": "artifacts/attempts/des3-key-leakage-audit.jsonl",
+                            "checkpoint_path": "artifacts/checkpoints/des3-key-leakage-audit/42.json",
+                            "record_path": "artifacts/runs/des3-key-leakage-audit/42.json",
+                            "cassette_path": "artifacts/cassettes/des3-key-leakage-audit.json",
+                            "output_file": "training_corpus.jsonl"
+                          },
+                          "payload_controls": {
+                            "run_id": "des3-key-leakage-audit",
+                            "seed": 42,
+                            "mode": "record",
+                            "resume": false,
+                            "num_rounds": 2,
+                            "max_refinements": 1
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                },
+                "event_time": "2026-08-25T23:30:48.733556Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "call_29034",
+                        "args": {
+                          "checkpoint_path": "artifacts/checkpoints/des3-key-leakage-audit/42.json",
+                          "attempts_path": "artifacts/attempts/des3-key-leakage-audit.jsonl",
+                          "record_path": "artifacts/runs/des3-key-leakage-audit/42.json",
+                          "cassette_path": "artifacts/cassettes/des3-key-leakage-audit.json"
+                        },
+                        "name": "summarize_artifacts"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                },
+                "event_time": "2026-08-25T23:30:48.739467Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "call_29034",
+                        "name": "summarize_artifacts",
+                        "response": {
+                          "status": "ok",
+                          "artifact_count": 4,
+                          "artifacts": {
+                            "attempts": {
+                              "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/attempts/des3-key-leakage-audit.jsonl",
+                              "exists": true,
+                              "row_count": 2,
+                              "decisions": {
+                                "accepted": 2
+                              },
+                              "pre_filter_stages": {},
+                              "verifier": {
+                                "rows": 2,
+                                "called": 2,
+                                "passes_audit": 2
+                              }
+                            },
+                            "checkpoint": {
+                              "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/checkpoints/des3-key-leakage-audit/42.json",
+                              "exists": true,
+                              "schema_version": 1,
+                              "run_id": "des3-key-leakage-audit",
+                              "seed": 42,
+                              "phase": "accepted",
+                              "refinement_round": 0,
+                              "updated_at": "2026-08-25T23:30:48Z"
+                            },
+                            "record": {
+                              "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/runs/des3-key-leakage-audit/42.json",
+                              "exists": true,
+                              "run_id": "des3-key-leakage-audit",
+                              "rng_seed": 42,
+                              "created_at": "2026-08-25T23:30:48Z",
+                              "models": {
+                                "judge": "ollama/gpt-oss:120b-cloud",
+                                "generator": "ollama/gemma4:31b-cloud",
+                                "verifier": "ollama/gpt-oss:120b-cloud",
+                                "debater": "ollama/gemma4:31b-cloud"
+                              },
+                              "usage_event_count": 0
+                            },
+                            "cassette": {
+                              "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/cassettes/des3-key-leakage-audit.json",
+                              "exists": true,
+                              "entry_count": 13
+                            }
+                          },
+                          "notes": [
+                            "Summary is computed from deterministic artifact files only.",
+                            "Cassette entries are local replay records, not provider-side cache telemetry."
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                },
+                "event_time": "2026-08-25T23:30:51.288952Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "call_33207",
+                        "args": {
+                          "attempts_path": "artifacts/attempts/des3-key-leakage-audit.jsonl",
+                          "input_path": "training_corpus.jsonl"
+                        },
+                        "name": "run_b_gate"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                },
+                "event_time": "2026-08-25T23:30:51.292098Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "call_33207",
+                        "name": "run_b_gate",
+                        "response": {
+                          "status": "ok",
+                          "passed": true,
+                          "failed_checks": [],
+                          "selected_metrics": {
+                            "total_rows": 8,
+                            "accepted_rows": 8,
+                            "b0_structural_completeness_pass_rate": 1.0,
+                            "b1_unsupported_in_accepted_rate": 0.0,
+                            "b1_inconclusive_in_accepted_rate": 0.0,
+                            "b2_anchor_match_rate": 1.0,
+                            "verifier_parse_ok_rate": 1.0,
+                            "verifier_pass_rate": 1.0,
+                            "accepted_attempt_logic_error_rate": 0.0,
+                            "accepted_corpus_logic_error_rate": 0.0
+                          },
+                          "metrics": {
+                            "input_path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/training_corpus.jsonl",
+                            "attempts_path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/attempts/des3-key-leakage-audit.jsonl",
+                            "total_rows": 8,
+                            "accepted_rows": 8,
+                            "failures": [],
+                            "b0_structural_completeness_pass_rate": 1.0,
+                            "b1_unsupported_in_accepted_rate": 0.0,
+                            "b1_inconclusive_in_accepted_rate": 0.0,
+                            "b2_anchor_match_rate": 1.0,
+                            "b2_generic_anchor_fraction": 0.0,
+                            "b1_unsupported_predicate_rate": 0.0,
+                            "b1_inconclusive_predicate_rate": 0.0,
+                            "attempts_total": 2,
+                            "b2_predicate_aboutness_fail_rate": 0.0,
+                            "b2_predicate_aboutness_total": 2,
+                            "predicate_quality_fail_rate": 0.0,
+                            "predicate_quality_total": 2,
+                            "b2_mechanism_grounding_fail_rate": 0.0,
+                            "b2_mechanism_grounding_total": 2,
+                            "verifier_called_rate": 1.0,
+                            "verifier_called_on_prowin_rate": 1.0,
+                            "prowin_total": 2,
+                            "verifier_parse_ok_rate": 1.0,
+                            "verifier_pass_rate": 1.0,
+                            "accepted_with_not_applicable_rate": 0.0,
+                            "accepted_attempt_logic_error_count": 0,
+                            "accepted_attempt_logic_error_rate": 0.0,
+                            "accepted_corpus_logic_error_count": 0,
+                            "accepted_corpus_logic_error_rate": 0.0,
+                            "accepted_logic_error_examples": [],
+                            "disagreement_judge_accept_but_verifier_missing_or_parse_fail_count": 0,
+                            "disagreement_verifier_pass_but_anchor_strict_fail_count": 0,
+                            "b2_strict_fail_rate": 0.0,
+                            "b2_strict_total": 2,
+                            "b2_strict_failures": {
+                              "anchors_too_few_after_normalization": 0,
+                              "anchors_no_match": 0,
+                              "mechanism_evidence_failed": 0
+                            },
+                            "usage_calls_total": 10,
+                            "usage_prompt_tokens_total": 23996,
+                            "usage_completion_tokens_total": 12096,
+                            "usage_total_tokens_total": 36092,
+                            "usage_cost_usd_total": 0.0,
+                            "usage_missing_usage_calls_total": 0,
+                            "usage_by_stage_totals": {
+                              "generator_boundary": {
+                                "calls": 2,
+                                "prompt_tokens": 11920,
+                                "completion_tokens": 3272,
+                                "total_tokens": 15192,
+                                "cost_usd": 0.0
+                              },
+                              "judge_adjudication": {
+                                "calls": 4,
+                                "prompt_tokens": 7332,
+                                "completion_tokens": 5036,
+                                "total_tokens": 12368,
+                                "cost_usd": 0.0
+                              },
+                              "verifier_audit": {
+                                "calls": 4,
+                                "prompt_tokens": 4744,
+                                "completion_tokens": 3788,
+                                "total_tokens": 8532,
+                                "cost_usd": 0.0
+                              }
+                            },
+                            "usage_by_model_totals": {
+                              "ollama/gemma4:31b-cloud": {
+                                "calls": 2,
+                                "prompt_tokens": 11920,
+                                "completion_tokens": 3272,
+                                "total_tokens": 15192,
+                                "cost_usd": 0.0
+                              },
+                              "ollama/gpt-oss:120b-cloud": {
+                                "calls": 8,
+                                "prompt_tokens": 12076,
+                                "completion_tokens": 8824,
+                                "total_tokens": 20900,
+                                "cost_usd": 0.0
+                              }
+                            },
+                            "usage_by_source_totals": {
+                              "provider": 10
+                            },
+                            "usage_by_source_rates": {
+                              "provider": 1.0
+                            },
+                            "efficiency_tokens_per_accepted_row": 4511.5,
+                            "efficiency_cost_per_accepted_row": 0.0,
+                            "efficiency_tokens_per_attempt": 18046.0,
+                            "efficiency_cost_per_attempt": 0.0,
+                            "efficiency_tokens_per_verifier_called_attempt": 18046.0,
+                            "efficiency_cost_per_verifier_called_attempt": 0.0,
+                            "generation_config_values": {
+                              "default": [
+                                {}
+                              ],
+                              "model_overrides": [
+                                {
+                                  "gemma4": {
+                                    "temperature": 1.0,
+                                    "top_k": 64,
+                                    "top_p": 0.95
+                                  }
+                                }
+                              ],
+                              "sampling_profile": [
+                                "ollama_gemma4"
+                              ]
+                            },
+                            "generation_config_missing_attempts": 0,
+                            "thresholds": {
+                              "min_accepted_rows": 1,
+                              "max_unsupported_in_accepted_rate": 0.05,
+                              "max_inconclusive_in_accepted_rate": 0.2,
+                              "min_anchor_match_rate": 0.8,
+                              "min_verifier_pass_rate": 0.0,
+                              "min_verifier_parse_ok_rate": 0.0,
+                              "max_accepted_logic_error_rate": 0.0,
+                              "max_cost_per_accepted_row": null,
+                              "max_tokens_per_accepted_row": null
+                            },
+                            "checks": {
+                              "max_unsupported_in_accepted_rate": true,
+                              "max_inconclusive_in_accepted_rate": true,
+                              "min_anchor_match_rate": true,
+                              "min_verifier_pass_rate": true,
+                              "min_verifier_parse_ok_rate": true,
+                              "max_accepted_logic_error_rate": true,
+                              "max_cost_per_accepted_row": true,
+                              "max_tokens_per_accepted_row": true
+                            },
+                            "anti_gaming_valid": true,
+                            "anti_gaming_violations": [],
+                            "pass": true
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                },
+                "event_time": "2026-08-25T23:30:53.461592Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_call": {
+                        "id": "call_1576556",
+                        "args": {
+                          "cassette_path": "artifacts/cassettes/des3-key-leakage-audit.json",
+                          "run_id": "des3-key-leakage-audit",
+                          "checkpoint_path": "artifacts/checkpoints/des3-key-leakage-audit/42.json",
+                          "attempts_path": "artifacts/attempts/des3-key-leakage-audit.jsonl",
+                          "record_path": "artifacts/runs/des3-key-leakage-audit/42.json",
+                          "input_path": "training_corpus.jsonl"
+                        },
+                        "name": "report_barred_run"
+                      }
+                    }
+                  ],
+                  "role": "model"
+                },
+                "event_time": "2026-08-25T23:30:53.464013Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "function_response": {
+                        "id": "call_1576556",
+                        "name": "report_barred_run",
+                        "response": {
+                          "status": "attention_required",
+                          "run_id": "des3-key-leakage-audit",
+                          "artifact_paths": {
+                            "input_path": "training_corpus.jsonl",
+                            "attempts_path": "artifacts/attempts/des3-key-leakage-audit.jsonl",
+                            "checkpoint_path": "artifacts/checkpoints/des3-key-leakage-audit/42.json",
+                            "record_path": "artifacts/runs/des3-key-leakage-audit/42.json",
+                            "cassette_path": "artifacts/cassettes/des3-key-leakage-audit.json",
+                            "llm_eval_result_path": "",
+                            "deterministic_eval_result_path": ""
+                          },
+                          "artifact_registry": {
+                            "corpus": {
+                              "path": "training_corpus.jsonl",
+                              "available": true,
+                              "storage": "local"
+                            },
+                            "attempts": {
+                              "path": "artifacts/attempts/des3-key-leakage-audit.jsonl",
+                              "available": true,
+                              "storage": "local"
+                            },
+                            "checkpoint": {
+                              "path": "artifacts/checkpoints/des3-key-leakage-audit/42.json",
+                              "available": true,
+                              "storage": "local"
+                            },
+                            "record": {
+                              "path": "artifacts/runs/des3-key-leakage-audit/42.json",
+                              "available": true,
+                              "storage": "local"
+                            },
+                            "cassette": {
+                              "path": "artifacts/cassettes/des3-key-leakage-audit.json",
+                              "available": true,
+                              "storage": "local"
+                            },
+                            "llm_eval_result": {
+                              "path": "",
+                              "available": false,
+                              "storage": "missing"
+                            },
+                            "deterministic_eval_result": {
+                              "path": "",
+                              "available": false,
+                              "storage": "missing"
+                            },
+                            "diagnostic_receipt": {
+                              "path": "",
+                              "available": false,
+                              "storage": "missing"
+                            }
+                          },
+                          "artifact_summary": {
+                            "status": "ok",
+                            "artifact_count": 4,
+                            "artifacts": {
+                              "attempts": {
+                                "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/attempts/des3-key-leakage-audit.jsonl",
+                                "exists": true,
+                                "row_count": 2,
+                                "decisions": {
+                                  "accepted": 2
+                                },
+                                "pre_filter_stages": {},
+                                "verifier": {
+                                  "rows": 2,
+                                  "called": 2,
+                                  "passes_audit": 2
+                                }
+                              },
+                              "checkpoint": {
+                                "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/checkpoints/des3-key-leakage-audit/42.json",
+                                "exists": true,
+                                "schema_version": 1,
+                                "run_id": "des3-key-leakage-audit",
+                                "seed": 42,
+                                "phase": "accepted",
+                                "refinement_round": 0,
+                                "updated_at": "2026-08-25T23:30:48Z"
+                              },
+                              "record": {
+                                "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/runs/des3-key-leakage-audit/42.json",
+                                "exists": true,
+                                "run_id": "des3-key-leakage-audit",
+                                "rng_seed": 42,
+                                "created_at": "2026-08-25T23:30:48Z",
+                                "models": {
+                                  "judge": "ollama/gpt-oss:120b-cloud",
+                                  "generator": "ollama/gemma4:31b-cloud",
+                                  "verifier": "ollama/gpt-oss:120b-cloud",
+                                  "debater": "ollama/gemma4:31b-cloud"
+                                },
+                                "usage_event_count": 0
+                              },
+                              "cassette": {
+                                "path": "/Users/surfiniaburger/Desktop/modular-metacog-swarm-v3/agent_training/silver-one/artifacts/cassettes/des3-key-leakage-audit.json",
+                                "exists": true,
+                                "entry_count": 13
+                              }
+                            },
+                            "notes": [
+                              "Summary is computed from deterministic artifact files only.",
+                              "Cassette entries are local replay records, not provider-side cache telemetry."
+                            ]
+                          },
+                          "b_gate": {
+                            "status": "ok",
+                            "passed": true,
+                            "failed_checks": [],
+                            "selected_metrics": {
+                              "total_rows": 8,
+                              "accepted_rows": 8,
+                              "b0_structural_completeness_pass_rate": 1.0,
+                              "b1_unsupported_in_accepted_rate": 0.0,
+                              "b1_inconclusive_in_accepted_rate": 0.0,
+                              "b2_anchor_match_rate": 1.0,
+                              "verifier_parse_ok_rate": 1.0,
+                              "verifier_pass_rate": 1.0,
+                              "accepted_attempt_logic_error_rate": 0.0,
+                              "accepted_corpus_logic_error_rate": 0.0
+                            },
+                            "error": null
+                          },
+                          "model_routing": {
+                            "record_models": {
+                              "judge": "ollama/gpt-oss:120b-cloud",
+                              "generator": "ollama/gemma4:31b-cloud",
+                              "verifier": "ollama/gpt-oss:120b-cloud",
+                              "debater": "ollama/gemma4:31b-cloud"
+                            },
+                            "attempt_models": {
+                              "attempt_rows": 2,
+                              "by_model_calls": {
+                                "ollama/gemma4:31b-cloud": 2,
+                                "ollama/gpt-oss:120b-cloud": 8
+                              },
+                              "usage_by_model_calls": {
+                                "ollama/gemma4:31b-cloud": 2,
+                                "ollama/gpt-oss:120b-cloud": 8
+                              },
+                              "verifier_model_counts": {
+                                "ollama/gpt-oss:120b-cloud": 2
+                              }
+                            }
+                          },
+                          "eval_results": {
+                            "llm": null,
+                            "deterministic": null
+                          },
+                          "report_checks": {
+                            "artifacts_read": true,
+                            "b_gate_passed": true,
+                            "verifier_parse_ok_rate_met": true,
+                            "deterministic_eval_present": false
+                          },
+                          "notes": [
+                            "Report is computed from local artifacts and eval result files only.",
+                            "Cassette replay records are not provider-side cache telemetry."
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "role": "user"
+                },
+                "event_time": "2026-08-25T23:30:55.072802Z"
+              },
+              {
+                "author": "root_agent",
+                "content": {
+                  "parts": [
+                    {
+                      "text": "### Security Debate Audit Result\n\n**Predicate Under Test:**\n> *\"The code is vulnerable to key‑material leakage because the expanded key buffers (enc_expkey and dec_expkey) are never explicitly zeroed when a crypto_tfm is freed or the module is unloaded\"*\n\n---\n\n### Audit Summary & Verdict\n\n- **Run ID:** `des3-key-leakage-audit`\n- **Adjudication Decision:** `accepted` (Pro debater position upheld)\n- **Judge Rationale Excerpt:** \n  > *\"The pro debater presents concrete evidence of a missing zeroing step and a clear predicate fulfillment, while the con debater's defense depends on optional kernel settings, making the pro position stronger.\"*\n\n---\n\n### Technical Security Finding\n\n1. **Missing Cleanup Handler (`.cra_exit` or `memzero_explicit`):**\n   - The context structure `struct des3_ede_x86_ctx` defines `enc_expkey` and `dec_expkey` buffers holding expanded DES key material (`u32 enc_expkey[DES3_EDE_EXPKEY_WORDS]`, `u32 dec_expkey[DES3_EDE_EXPKEY_WORDS]`).\n   - The cipher algorithms registered in `des3_ede_algs` do not specify a `.cra_exit` cleanup function to wipe `crypto_tfm_ctx(tfm)` upon release.\n   - When a `crypto_tfm` object is freed or the module is unloaded, sensitive expanded subkeys remain in freed heap memory, exposing key material to potential residual memory extraction attacks.\n\n---\n\n### Deterministic BARRED Artifact & B-Gate Metrics\n\n| Metric | Result / Rate | Status |\n| :--- | :--- | :--- |\n| **B-Gate Overall Status** | `PASS` | Passed |\n| **B0 Structural Completeness Rate** | `1.0` (100%) | Pass |\n| **B1 Unsupported Predicate Rate** | `0.0` (0%) | Pass |\n| **B1 Inconclusive Predicate Rate** | `0.0` (0%) | Pass |\n| **B2 Anchor Match Rate** | `1.0` (100%) | Pass |\n| **Verifier Pass Rate** | `1.0` (100%) | Pass |\n| **Verifier Parse-OK Rate** | `1.0` (100%) | Pass |\n| **Accepted Logic Error Rate** | `0.0` (0%) | Pass |\n| **Accepted Attempts Count** | `2` | Pass |\n\n#### Model Routing Metadata\n- **Generator / Debater Model:** `ollama/gemma4:31b-cloud`\n- **Judge / Verifier Model:** `ollama/gpt-oss:120b-cloud`\n- **Cassette File:** `artifacts/cassettes/des3-key-leakage-audit.json` (13 local replay entries)\n- **Attempts File:** `artifacts/attempts/des3-key-leakage-audit.jsonl`\n- **Run Record:** `artifacts/runs/des3-key-leakage-audit/42.json`"
+                    }
+                  ],
+                  "role": "model"
+                },
+                "event_time": "2026-08-25T23:30:55.074638Z"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

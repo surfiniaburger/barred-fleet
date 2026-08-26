@@ -16,6 +16,19 @@ AI-generated security labels are cheap to produce and expensive to trust. A mode
 
 BARRED-Fleet makes that acceptance layer visible.
 
+## The BARRED Swarm Methodology
+
+Building upon the foundational Plural AI multi-agent debate research (**BARRED**: *Boundary Adversarial Reasoning for Reproducible Evaluation and Dataset generation*), `BARRED-Fleet` surfaces the six architectural pillars of the expanded **BARRED-Swarm** (*Boundary-Aware Reflective Robust Exploration & Debate*):
+
+| Letter | Architectural Component | Role in the Swarm |
+| :---: | :--- | :--- |
+| **B** | **Boundary-Aware** | Extracts vulnerability dimensions (CVE predicates, boundary conditions, reachability constraints) and synthesizes edge-case code samples. |
+| **A** | **Asymmetric** | Orchestrates opposing purple agents (Pro-Attacker vs. Con-Defender) supervised by a green judge to eliminate hallucinated consensus. |
+| **R** | **Reflective** | Executes iterative refinement via the GEPA Reflector (reflective meta-prompt mutation and diagnostic triage across refinement rounds). |
+| **R** | **Robust** | Enforces deterministic quality floors via the B-Gate (AST parse coverage, strict anchor grounding, zero logic errors, and parse reliability). |
+| **E** | **Exploration** | Drives stratified, scenario-grouped cross-validation across holdouts to ensure zero data leakage between train/test partitions. |
+| **D** | **Debate / Dataset** | Generates verified, high-fidelity synthetic training corpora used to train and evaluate code-security guardrail models. |
+
 ## What This Demo Shows
 
 The deployed demo has two modes:

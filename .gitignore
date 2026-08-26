@@ -211,17 +211,9 @@ tools/a2a-inspector/
 *.pem
 *-key.json
 credentials*.json
-*/grade_results
-
-# Local generated artifacts and eval traces
-artifacts/traces/
-artifacts/grade_results/
-artifacts/cloud_smoke/
+# Temporary databases
 *.sqlite
 *.db
-
-# Generated local/cloud eval artifacts
-artifacts/
 
 # Keep source repo light; host video on YouTube/Vimeo for Devpost
 *.mov
