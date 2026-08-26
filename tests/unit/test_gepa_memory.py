@@ -345,3 +345,35 @@ def test_gepa_memory_preview_endpoint_reports_missing_artifacts(
     assert payload["status"] == "attention_required"
     assert "pareto frontier artifact does not exist" in payload["error"]
     assert payload["memory"] is None
+
+
+def test_pareto_specialist_schema_and_loader(tmp_path: Path) -> None:
+    pareto_file = tmp_path / "pareto_frontier.json"
+    _write_json(
+        pareto_file,
+        {
+            "memory_safety": {
+                "prompt": "You are a memory safety specialist.\n1. Verify buffer bounds.\n2. Check memcpy sizes.",
+                "score": 9.8,
+                "updated_at": "2026-08-26T20:00:00Z",
+                "variant_id": "var_mem_98",
+            }
+        },
+    )
+
+    from app.gepa_memory import (
+        get_pareto_directive_for_taxonomy,
+        load_pareto_specialists,
+    )
+
+    specialists = load_pareto_specialists(pareto_file)
+    assert "memory_safety" in specialists
+    spec = specialists["memory_safety"]
+    assert spec.score == 9.8
+    assert spec.variant_id == "var_mem_98"
+    assert len(spec.prompt_sha256) == 64
+    assert spec.to_dict()["taxonomy_bucket"] == "memory_safety"
+
+    directive = get_pareto_directive_for_taxonomy("memory_safety", pareto_file)
+    assert "1. Verify buffer bounds." in directive
+
