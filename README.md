@@ -137,6 +137,8 @@ For future agents or post-submission continuation:
 
 ## Architecture
 
+![BARRED-Fleet System Architecture](docs/architecture_diagram.png)
+
 ```mermaid
 flowchart LR
     User["User / Judge"] --> Demo["/demo UI"]
