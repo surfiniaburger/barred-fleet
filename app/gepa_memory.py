@@ -443,3 +443,91 @@ def _optional_float(value: Any) -> float | None:
 
 def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+class ParetoSpecialist:
+    """Represents a domain-specialized prompt invariant stored in the Pareto Memory Bank."""
+
+    def __init__(
+        self,
+        taxonomy_bucket: str,
+        prompt: str,
+        score: float,
+        updated_at: str,
+        variant_id: str,
+    ) -> None:
+        """Initialize a ParetoSpecialist entry with prompt metadata and calculated hash."""
+        self.taxonomy_bucket = taxonomy_bucket
+        self.prompt = prompt
+        self.score = score
+        self.updated_at = updated_at
+        self.variant_id = variant_id
+        self.prompt_sha256 = _sha256_text(prompt) if prompt else ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize specialist metadata without exposing sensitive raw prompt content."""
+        return {
+            "taxonomy_bucket": self.taxonomy_bucket,
+            "score": self.score,
+            "variant_id": self.variant_id,
+            "prompt_sha256": self.prompt_sha256,
+            "updated_at": self.updated_at,
+        }
+
+    def format_micro_directive(self, max_words: int = 25) -> str:
+        """Extract a concise token-bounded (15-30 token) micro-directive from the specialist prompt."""
+        lines = [line.strip() for line in self.prompt.splitlines() if line.strip()]
+        selected = ""
+        for line in lines:
+            if line.startswith("1.") or line.startswith("-") or "Focus on" in line:
+                selected = line
+                break
+        if not selected:
+            selected = lines[0] if lines else f"Specialize analysis for {self.taxonomy_bucket}."
+
+        words = selected.split()
+        if len(words) > max_words:
+            return " ".join(words[:max_words]) + "..."
+        return selected
+
+
+def load_pareto_specialists(
+    pareto_frontier_path: Path | None = None,
+) -> dict[str, ParetoSpecialist]:
+    """Load active Pareto specialists from the Pareto Memory Bank artifact, skipping empty entries."""
+    target_path = pareto_frontier_path or DEFAULT_PARETO_FRONTIER_PATH
+    if not target_path.exists():
+        # Fallback to local sibling path if run inside barred-fleet subdirectory
+        alt_path = Path("artifacts/gepa/pareto_frontier.json")
+        if alt_path.exists():
+            target_path = alt_path
+        else:
+            return {}
+
+    raw_data = _read_optional_json(target_path)
+    specialists: dict[str, ParetoSpecialist] = {}
+    for bucket, entry in raw_data.items():
+        if isinstance(entry, Mapping):
+            prompt = _text(entry.get("prompt"))
+            if not prompt:
+                continue
+            specialists[bucket] = ParetoSpecialist(
+                taxonomy_bucket=bucket,
+                prompt=prompt,
+                score=_optional_float(entry.get("score")) or 0.0,
+                updated_at=_text(entry.get("updated_at")),
+                variant_id=_text(entry.get("variant_id")),
+            )
+    return specialists
+
+
+def get_pareto_directive_for_taxonomy(
+    taxonomy: str,
+    pareto_frontier_path: Path | None = None,
+) -> str:
+    """Retrieve the optimal Pareto micro-directive for a given vulnerability taxonomy or fallback."""
+    specialists = load_pareto_specialists(pareto_frontier_path)
+    if taxonomy in specialists:
+        return specialists[taxonomy].format_micro_directive()
+    return f"Enforce strict AST reachability invariants for {taxonomy}."
+

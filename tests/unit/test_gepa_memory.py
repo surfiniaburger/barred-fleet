@@ -345,3 +345,89 @@ def test_gepa_memory_preview_endpoint_reports_missing_artifacts(
     assert payload["status"] == "attention_required"
     assert "pareto frontier artifact does not exist" in payload["error"]
     assert payload["memory"] is None
+
+
+def test_pareto_specialist_schema_and_loader(tmp_path: Path) -> None:
+    """Verify that load_pareto_specialists loads valid entries and calculates SHA256 hashes."""
+    pareto_file = tmp_path / "pareto_frontier.json"
+    _write_json(
+        pareto_file,
+        {
+            "memory_safety": {
+                "prompt": "You are a memory safety specialist.\n1. Verify buffer bounds.\n2. Check memcpy sizes.",
+                "score": 9.8,
+                "updated_at": "2026-08-26T20:00:00Z",
+                "variant_id": "var_mem_98",
+            }
+        },
+    )
+
+    from app.gepa_memory import (
+        get_pareto_directive_for_taxonomy,
+        load_pareto_specialists,
+    )
+
+    specialists = load_pareto_specialists(pareto_file)
+    assert "memory_safety" in specialists
+    spec = specialists["memory_safety"]
+    assert spec.score == 9.8
+    assert spec.variant_id == "var_mem_98"
+    assert len(spec.prompt_sha256) == 64
+    assert spec.to_dict()["taxonomy_bucket"] == "memory_safety"
+
+    directive = get_pareto_directive_for_taxonomy("memory_safety", pareto_file)
+    assert "1. Verify buffer bounds." in directive
+
+
+def test_pareto_specialist_long_directive_truncation(tmp_path: Path) -> None:
+    """Verify that format_micro_directive truncates overly long lines to preserve token budget."""
+    long_line = "1. " + " ".join(["check_bound_operation"] * 40)
+    pareto_file = tmp_path / "pareto_frontier.json"
+    _write_json(
+        pareto_file,
+        {
+            "concurrency": {
+                "prompt": f"You are a concurrency specialist.\n{long_line}",
+                "score": 7.5,
+                "updated_at": "2026-08-26T20:00:00Z",
+                "variant_id": "var_conc_long",
+            }
+        },
+    )
+
+    from app.gepa_memory import get_pareto_directive_for_taxonomy, load_pareto_specialists
+
+    specialists = load_pareto_specialists(pareto_file)
+    directive = specialists["concurrency"].format_micro_directive(max_words=10)
+    assert directive.endswith("...")
+    assert len(directive.split()) <= 11
+
+
+def test_pareto_specialist_skips_empty_prompt_and_falls_back(tmp_path: Path) -> None:
+    """Verify that incomplete or empty prompt entries are skipped and default to AST reachability fallback."""
+    pareto_file = tmp_path / "pareto_frontier.json"
+    _write_json(
+        pareto_file,
+        {
+            "empty_taxonomy": {
+                "prompt": "   ",
+                "score": 0.0,
+                "updated_at": "2026-08-26T20:00:00Z",
+                "variant_id": "var_empty",
+            },
+            "no_prompt_taxonomy": {
+                "score": 1.0,
+            },
+        },
+    )
+
+    from app.gepa_memory import get_pareto_directive_for_taxonomy, load_pareto_specialists
+
+    specialists = load_pareto_specialists(pareto_file)
+    assert "empty_taxonomy" not in specialists
+    assert "no_prompt_taxonomy" not in specialists
+
+    fallback_directive = get_pareto_directive_for_taxonomy("empty_taxonomy", pareto_file)
+    assert fallback_directive == "Enforce strict AST reachability invariants for empty_taxonomy."
+
+
