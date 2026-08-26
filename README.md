@@ -266,6 +266,21 @@ Local deterministic eval grading:
 make eval-report-grade-deterministic
 ```
 
+Run ADK CLI benchmark evaluation & comparison:
+
+```bash
+# Grade the Graph-GEPA multi-round suite (83 cases)
+agents-cli eval grade \
+  --traces artifacts/traces/graph_gepa_multi_round_traces.json \
+  --config tests/eval/eval_config_cve_ab.yaml \
+  --output artifacts/grade_results/graph_gepa_graded/
+
+# Run side-by-side comparison with baseline
+agents-cli eval compare \
+  artifacts/grade_results/baseline_new/results_20260826_004955.json \
+  artifacts/grade_results/graph_gepa_graded/results_20260826_011010.json
+```
+
 Browser demo path:
 
 ```text
