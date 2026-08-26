@@ -19,7 +19,7 @@ from collections.abc import AsyncIterator
 
 from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import Runner
@@ -34,6 +34,7 @@ from app.fresh_debate import (
     run_fresh_debate_async,
 )
 from app.gepa_memory import build_gepa_memory_preview
+from app.memory_bank import EnterpriseMemoryBank
 from app.run_lifecycle import (
     build_product_run_report,
     create_product_run,
@@ -166,12 +167,23 @@ def gepa_memory_preview() -> dict:
     return build_gepa_memory_preview(env=os.environ)
 
 
-@app.get("/memory/gepa/query")
-def gepa_memory_query(taxonomy: str = "memory_safety") -> dict:
-    """Query the Enterprise Memory Bank for an active specialized Pareto directive."""
+def get_memory_bank(request: Request) -> EnterpriseMemoryBank:
+    """Provide a cached EnterpriseMemoryBank instance per application process."""
     from app.memory_bank import EnterpriseMemoryBank
 
-    bank = EnterpriseMemoryBank()
+    bank = getattr(request.app.state, "memory_bank", None)
+    if bank is None:
+        bank = EnterpriseMemoryBank()
+        request.app.state.memory_bank = bank
+    return bank
+
+
+@app.get("/memory/gepa/query")
+def gepa_memory_query(
+    taxonomy: str = "memory_safety",
+    bank: EnterpriseMemoryBank = Depends(get_memory_bank),
+) -> dict:
+    """Query the Enterprise Memory Bank for an active specialized Pareto directive."""
     return bank.get_specialist(taxonomy=taxonomy)
 
 

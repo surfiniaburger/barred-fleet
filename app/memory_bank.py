@@ -48,33 +48,34 @@ class EnterpriseMemoryBank:
         self.cache_ttl_seconds = cache_ttl_seconds
         self._firestore_client = firestore_client
         self._cache: dict[str, dict[str, Any]] = {}
-        self._last_fetch_timestamp: float = 0.0
 
     def get_specialist(self, taxonomy: str) -> dict[str, Any]:
         """Retrieve a specialist Pareto invariant directive and metadata for a given taxonomy."""
         normalized_taxonomy = taxonomy.strip().lower()
         now = time.time()
 
-        # Check in-memory cache
-        if (
-            now - self._last_fetch_timestamp < self.cache_ttl_seconds
-            and normalized_taxonomy in self._cache
-        ):
-            cached_result = dict(self._cache[normalized_taxonomy])
+        # Check per-taxonomy in-memory cache
+        cached_entry = self._cache.get(normalized_taxonomy)
+        if cached_entry and now < cached_entry.get("expires_at", 0.0):
+            cached_result = dict(cached_entry["data"])
             cached_result["cached"] = True
             return cached_result
 
         # Try Firestore fetch if available
         firestore_result = self._fetch_from_firestore(normalized_taxonomy)
         if firestore_result:
-            self._cache[normalized_taxonomy] = firestore_result
-            self._last_fetch_timestamp = now
+            self._cache[normalized_taxonomy] = {
+                "data": firestore_result,
+                "expires_at": now + self.cache_ttl_seconds,
+            }
             return firestore_result
 
         # Fallback to local Pareto artifact
         local_result = self._fetch_from_local_artifact(normalized_taxonomy)
-        self._cache[normalized_taxonomy] = local_result
-        self._last_fetch_timestamp = now
+        self._cache[normalized_taxonomy] = {
+            "data": local_result,
+            "expires_at": now + self.cache_ttl_seconds,
+        }
         return local_result
 
     def _fetch_from_firestore(self, taxonomy: str) -> dict[str, Any] | None:
@@ -107,7 +108,7 @@ class EnterpriseMemoryBank:
                     "cached": False,
                 }
         except Exception as exc:
-            logger.warning("Failed to fetch taxonomy %s from Firestore: %s", taxonomy, exc)
+            logger.warning("Failed to fetch taxonomy document from Firestore: %s", type(exc).__name__)
             return None
         return None
 
@@ -138,6 +139,8 @@ class EnterpriseMemoryBank:
 
     def _get_firestore_client(self) -> Any | None:
         """Lazily initialize or return the injected Firestore client."""
+        if self._firestore_client is False:
+            return None
         if self._firestore_client is not None:
             return self._firestore_client
         try:
@@ -149,5 +152,5 @@ class EnterpriseMemoryBank:
             )
             return self._firestore_client
         except Exception as exc:
-            logger.debug("Firestore client unavailable: %s", exc)
+            logger.debug("Firestore client unavailable: %s", type(exc).__name__)
             return None

@@ -4,13 +4,13 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from app.fast_api_app import app
+from app.fast_api_app import app, get_memory_bank
 from app.memory_bank import EnterpriseMemoryBank
 
 
 def test_memory_bank_local_artifact_resolution() -> None:
     """Verify that EnterpriseMemoryBank resolves local Pareto specialist directives."""
-    bank = EnterpriseMemoryBank(firestore_client=None)
+    bank = EnterpriseMemoryBank(firestore_client=False)
     result = bank.get_specialist("memory_safety")
 
     assert result["taxonomy_bucket"] == "memory_safety"
@@ -26,7 +26,7 @@ def test_memory_bank_local_artifact_resolution() -> None:
 
 def test_memory_bank_unknown_taxonomy_fallback() -> None:
     """Verify that EnterpriseMemoryBank defaults to AST reachability rule on unknown category."""
-    bank = EnterpriseMemoryBank(firestore_client=None)
+    bank = EnterpriseMemoryBank(firestore_client=False)
     result = bank.get_specialist("unknown_zero_day_taxonomy")
 
     assert result["taxonomy_bucket"] == "unknown_zero_day_taxonomy"
@@ -65,12 +65,19 @@ def test_memory_bank_firestore_mock_resolution() -> None:
 
 
 def test_gepa_memory_query_endpoint() -> None:
-    """Verify that GET /memory/gepa/query returns valid specialist payload."""
-    with TestClient(app) as client:
-        response = client.get("/memory/gepa/query?taxonomy=input_validation")
+    """Verify that GET /memory/gepa/query returns valid specialist payload with dependency injection."""
+    mock_bank = EnterpriseMemoryBank(firestore_client=False)
+    app.dependency_overrides[get_memory_bank] = lambda: mock_bank
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["taxonomy_bucket"] == "input_validation"
-    assert "active_directive" in payload
-    assert payload["score"] > 0.0
+    try:
+        with TestClient(app) as client:
+            response = client.get("/memory/gepa/query?taxonomy=input_validation")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["taxonomy_bucket"] == "input_validation"
+        assert "active_directive" in payload
+        assert payload["score"] > 0.0
+    finally:
+        app.dependency_overrides.pop(get_memory_bank, None)
+
