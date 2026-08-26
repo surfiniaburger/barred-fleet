@@ -166,6 +166,16 @@ def gepa_memory_preview() -> dict:
     return build_gepa_memory_preview(env=os.environ)
 
 
+@app.get("/memory/gepa/query")
+def gepa_memory_query(taxonomy: str = "memory_safety") -> dict:
+    """Query the Enterprise Memory Bank for an active specialized Pareto directive."""
+    from app.memory_bank import EnterpriseMemoryBank
+
+    bank = EnterpriseMemoryBank()
+    return bank.get_specialist(taxonomy=taxonomy)
+
+
+
 @app.get("/runs/{run_id}")
 def get_run(run_id: str) -> dict:
     """Return product-shaped BARRED run lifecycle metadata."""
