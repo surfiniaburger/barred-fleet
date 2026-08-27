@@ -37,6 +37,7 @@ class EnterpriseMemoryBank:
         firestore_client: Any | None = None,
         *,
         max_cache_entries: int = 128,
+        clock: Any | None = None,
     ) -> None:
         """Initialize the Enterprise Memory Bank with optional cloud credentials, locks, and in-memory cache."""
         if max_cache_entries < 1:
@@ -54,13 +55,14 @@ class EnterpriseMemoryBank:
         self.cache_ttl_seconds = cache_ttl_seconds
         self.max_cache_entries = max_cache_entries
         self._firestore_client = firestore_client
+        self._clock = clock if callable(clock) else time.time
         self._cache: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
 
     def get_specialist(self, taxonomy: str) -> dict[str, Any]:
         """Retrieve a specialist Pareto invariant directive and metadata for a given taxonomy."""
         normalized_taxonomy = taxonomy.strip().lower()
-        now = time.time()
+        now = self._clock()
 
         # Check per-taxonomy in-memory cache under thread lock
         with self._lock:
@@ -73,17 +75,18 @@ class EnterpriseMemoryBank:
         # Try Firestore fetch if available
         firestore_result = self._fetch_from_firestore(normalized_taxonomy)
         if firestore_result:
-            self._set_cached(normalized_taxonomy, firestore_result, now)
+            self._set_cached(normalized_taxonomy, firestore_result)
             return firestore_result
 
         # Fallback to local Pareto artifact
         local_result = self._fetch_from_local_artifact(normalized_taxonomy)
-        self._set_cached(normalized_taxonomy, local_result, now)
+        self._set_cached(normalized_taxonomy, local_result)
         return local_result
 
-    def _set_cached(self, taxonomy: str, data: dict[str, Any], now: float) -> None:
+    def _set_cached(self, taxonomy: str, data: dict[str, Any]) -> None:
         """Store a cache entry thread-safely while pruning expired items and enforcing maximum size boundary."""
         with self._lock:
+            now = self._clock()
             # Remove expired entries
             expired_keys = [k for k, v in self._cache.items() if now >= v.get("expires_at", 0.0)]
             for k in expired_keys:

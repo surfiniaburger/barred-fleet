@@ -136,4 +136,32 @@ def test_memory_bank_concurrency_thread_safety() -> None:
     assert len(bank._cache) <= 5
 
 
+def test_memory_bank_custom_clock_and_ttl_expiration() -> None:
+    """Verify that custom clock accurately drives TTL cache expiration."""
+    current_time = 1000.0
+
+    def mock_clock() -> float:
+        return current_time
+
+    bank = EnterpriseMemoryBank(
+        firestore_client=False,
+        cache_ttl_seconds=60,
+        clock=mock_clock,
+    )
+
+    # Initial fetch
+    res1 = bank.get_specialist("memory_safety")
+    assert res1["cached"] is False
+
+    # Immediate second fetch at t=1000
+    res2 = bank.get_specialist("memory_safety")
+    assert res2["cached"] is True
+
+    # Advance clock past TTL (t=1061)
+    current_time = 1061.0
+    res3 = bank.get_specialist("memory_safety")
+    assert res3["cached"] is False
+
+
+
 
