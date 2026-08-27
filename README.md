@@ -18,7 +18,7 @@ BARRED-Fleet makes that acceptance layer visible.
 
 ## The BARRED Swarm Methodology
 
-Building upon the foundational Plural AI multi-agent debate research (**BARRED**: *Boundary Adversarial Reasoning for Reproducible Evaluation and Decision*), `BARRED-Fleet` surfaces the six architectural pillars of the expanded **BARRED-Swarm** (*Boundary-Aware Reflective Robust Exploration & Decision*):
+Building upon the foundational Plural AI multi-agent debate research (**BARRED**: *Boundary Alignment Refinement through REflection and Debate*), `BARRED-Fleet` surfaces the six architectural pillars of the expanded **BARRED-Swarm** (*Boundary-Aware Reflective Robust Exploration & Decision*):
 
 | Letter | Architectural Component | Role in the Swarm |
 | :--- | :--- | :--- |
