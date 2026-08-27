@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -33,10 +34,14 @@ class EnterpriseMemoryBank:
         database: str | None = None,
         collection: str | None = None,
         cache_ttl_seconds: int = 300,
-        max_cache_entries: int = 128,
         firestore_client: Any | None = None,
+        *,
+        max_cache_entries: int = 128,
     ) -> None:
-        """Initialize the Enterprise Memory Bank with optional cloud credentials and in-memory cache."""
+        """Initialize the Enterprise Memory Bank with optional cloud credentials, locks, and in-memory cache."""
+        if max_cache_entries < 1:
+            raise ValueError("max_cache_entries must be at least 1")
+
         self.project_id = project_id or os.getenv(
             MEMORY_BANK_FIRESTORE_PROJECT_ENV, DEFAULT_FIRESTORE_PROJECT
         )
@@ -50,18 +55,20 @@ class EnterpriseMemoryBank:
         self.max_cache_entries = max_cache_entries
         self._firestore_client = firestore_client
         self._cache: dict[str, dict[str, Any]] = {}
+        self._lock = threading.Lock()
 
     def get_specialist(self, taxonomy: str) -> dict[str, Any]:
         """Retrieve a specialist Pareto invariant directive and metadata for a given taxonomy."""
         normalized_taxonomy = taxonomy.strip().lower()
         now = time.time()
 
-        # Check per-taxonomy in-memory cache
-        cached_entry = self._cache.get(normalized_taxonomy)
-        if cached_entry and now < cached_entry.get("expires_at", 0.0):
-            cached_result = dict(cached_entry["data"])
-            cached_result["cached"] = True
-            return cached_result
+        # Check per-taxonomy in-memory cache under thread lock
+        with self._lock:
+            cached_entry = self._cache.get(normalized_taxonomy)
+            if cached_entry and now < cached_entry.get("expires_at", 0.0):
+                cached_result = dict(cached_entry["data"])
+                cached_result["cached"] = True
+                return cached_result
 
         # Try Firestore fetch if available
         firestore_result = self._fetch_from_firestore(normalized_taxonomy)
@@ -75,21 +82,22 @@ class EnterpriseMemoryBank:
         return local_result
 
     def _set_cached(self, taxonomy: str, data: dict[str, Any], now: float) -> None:
-        """Store a cache entry while pruning expired items and enforcing maximum size boundary."""
-        # Remove expired entries
-        expired_keys = [k for k, v in self._cache.items() if now >= v.get("expires_at", 0.0)]
-        for k in expired_keys:
-            self._cache.pop(k, None)
+        """Store a cache entry thread-safely while pruning expired items and enforcing maximum size boundary."""
+        with self._lock:
+            # Remove expired entries
+            expired_keys = [k for k, v in self._cache.items() if now >= v.get("expires_at", 0.0)]
+            for k in expired_keys:
+                self._cache.pop(k, None)
 
-        # Evict earliest expiring entry if at maximum capacity
-        if len(self._cache) >= self.max_cache_entries and taxonomy not in self._cache:
-            earliest_key = min(self._cache, key=lambda k: self._cache[k].get("expires_at", 0.0))
-            self._cache.pop(earliest_key, None)
+            # Evict earliest expiring entry if at maximum capacity
+            if len(self._cache) >= self.max_cache_entries and taxonomy not in self._cache:
+                earliest_key = min(self._cache, key=lambda k: self._cache[k].get("expires_at", 0.0))
+                self._cache.pop(earliest_key, None)
 
-        self._cache[taxonomy] = {
-            "data": data,
-            "expires_at": now + self.cache_ttl_seconds,
-        }
+            self._cache[taxonomy] = {
+                "data": data,
+                "expires_at": now + self.cache_ttl_seconds,
+            }
 
     def _fetch_from_firestore(self, taxonomy: str) -> dict[str, Any] | None:
         """Attempt to fetch a Pareto invariant document from Firestore."""

@@ -97,3 +97,43 @@ def test_memory_bank_bounded_cache_eviction() -> None:
     assert len(bank._cache) <= 3
 
 
+def test_memory_bank_rejects_non_positive_cache_capacity() -> None:
+    """Verify that EnterpriseMemoryBank rejects non-positive max_cache_entries values."""
+    with pytest.raises(ValueError, match="max_cache_entries must be at least 1"):
+        EnterpriseMemoryBank(firestore_client=False, max_cache_entries=0)
+
+    with pytest.raises(ValueError, match="max_cache_entries must be at least 1"):
+        EnterpriseMemoryBank(firestore_client=False, max_cache_entries=-5)
+
+
+def test_memory_bank_positional_arguments_compatibility() -> None:
+    """Verify that legacy positional arguments correctly bind to firestore_client."""
+    mock_client = MagicMock()
+    bank = EnterpriseMemoryBank("test-proj", "test-db", "test-coll", 120, mock_client)
+
+    assert bank.project_id == "test-proj"
+    assert bank.database == "test-db"
+    assert bank.collection == "test-coll"
+    assert bank.cache_ttl_seconds == 120
+    assert bank._firestore_client == mock_client
+
+
+def test_memory_bank_concurrency_thread_safety() -> None:
+    """Verify that concurrent requests safely mutate cache without race conditions or overflow."""
+    import concurrent.futures
+
+    bank = EnterpriseMemoryBank(firestore_client=False, max_cache_entries=5, cache_ttl_seconds=300)
+
+    def worker(worker_id: int) -> dict:
+        tax = f"taxonomy_{worker_id % 15}"
+        return bank.get_specialist(tax)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(worker, i) for i in range(50)]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    assert len(results) == 50
+    assert len(bank._cache) <= 5
+
+
+
