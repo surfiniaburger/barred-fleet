@@ -81,3 +81,19 @@ def test_gepa_memory_query_endpoint() -> None:
     finally:
         app.dependency_overrides.pop(get_memory_bank, None)
 
+
+def test_memory_bank_bounded_cache_eviction() -> None:
+    """Verify that EnterpriseMemoryBank caps cache size at max_cache_entries."""
+    bank = EnterpriseMemoryBank(firestore_client=False, max_cache_entries=3, cache_ttl_seconds=300)
+
+    # Insert 3 entries
+    bank.get_specialist("taxonomy_1")
+    bank.get_specialist("taxonomy_2")
+    bank.get_specialist("taxonomy_3")
+    assert len(bank._cache) == 3
+
+    # Insert 4th entry - should evict one to stay at max 3
+    bank.get_specialist("taxonomy_4")
+    assert len(bank._cache) <= 3
+
+

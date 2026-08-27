@@ -33,6 +33,7 @@ class EnterpriseMemoryBank:
         database: str | None = None,
         collection: str | None = None,
         cache_ttl_seconds: int = 300,
+        max_cache_entries: int = 128,
         firestore_client: Any | None = None,
     ) -> None:
         """Initialize the Enterprise Memory Bank with optional cloud credentials and in-memory cache."""
@@ -46,6 +47,7 @@ class EnterpriseMemoryBank:
             MEMORY_BANK_FIRESTORE_COLLECTION_ENV, DEFAULT_FIRESTORE_COLLECTION
         )
         self.cache_ttl_seconds = cache_ttl_seconds
+        self.max_cache_entries = max_cache_entries
         self._firestore_client = firestore_client
         self._cache: dict[str, dict[str, Any]] = {}
 
@@ -64,19 +66,30 @@ class EnterpriseMemoryBank:
         # Try Firestore fetch if available
         firestore_result = self._fetch_from_firestore(normalized_taxonomy)
         if firestore_result:
-            self._cache[normalized_taxonomy] = {
-                "data": firestore_result,
-                "expires_at": now + self.cache_ttl_seconds,
-            }
+            self._set_cached(normalized_taxonomy, firestore_result, now)
             return firestore_result
 
         # Fallback to local Pareto artifact
         local_result = self._fetch_from_local_artifact(normalized_taxonomy)
-        self._cache[normalized_taxonomy] = {
-            "data": local_result,
+        self._set_cached(normalized_taxonomy, local_result, now)
+        return local_result
+
+    def _set_cached(self, taxonomy: str, data: dict[str, Any], now: float) -> None:
+        """Store a cache entry while pruning expired items and enforcing maximum size boundary."""
+        # Remove expired entries
+        expired_keys = [k for k, v in self._cache.items() if now >= v.get("expires_at", 0.0)]
+        for k in expired_keys:
+            self._cache.pop(k, None)
+
+        # Evict earliest expiring entry if at maximum capacity
+        if len(self._cache) >= self.max_cache_entries and taxonomy not in self._cache:
+            earliest_key = min(self._cache, key=lambda k: self._cache[k].get("expires_at", 0.0))
+            self._cache.pop(earliest_key, None)
+
+        self._cache[taxonomy] = {
+            "data": data,
             "expires_at": now + self.cache_ttl_seconds,
         }
-        return local_result
 
     def _fetch_from_firestore(self, taxonomy: str) -> dict[str, Any] | None:
         """Attempt to fetch a Pareto invariant document from Firestore."""
